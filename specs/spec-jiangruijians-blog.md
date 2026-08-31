@@ -189,9 +189,9 @@ OPENAI_API_KEY=                        # 或 DEEPSEEK_API_KEY / DASHSCOPE_API_KE
 | S2   | 装 Supabase + Drizzle 依赖，写客户端 + 环境变量        | ✅ 已完成                                        |
 | S3   | 创建 Supabase 项目，填真实密钥，Drizzle 建表 + rls.sql | ✅ 已完成（表/RLS/RPC 已就位）                   |
 | S4   | Auth（GitHub OAuth）+ proxy.ts + admin                 | ✅ 已完成（改用 NextAuth；单管理员，邮箱白名单） |
-| S5   | 文章 CRUD + 后台编辑器                                 | ▶ 下一步（@mdxeditor 已装）                      |
+| S5   | 文章 CRUD + 后台编辑器                                 | ✅ 已完成（封面图字段未接入表单，见偏差说明）    |
 | S6   | 前台列表/详情 + Markdown 渲染                          | 待做                                             |
-| S7   | 标签/搜索/分页/阅读量/评论                             | ⬜ 待做（评论计划改走 Giscus）                   |
+| S7   | 标签/搜索/分页/阅读量/评论                             | ⬜ 待做（pg_trgm 索引/阅读量 RPC 已提前铺好；评论改走 Giscus） |
 | S8   | SEO / RSS / 关于页                                     | 待做                                             |
 | S9   | AI 摘要/标签/RAG                                       | ⏸ 延后（暂不做）                                 |
 | S10  | Vercel 部署 + 域名                                     | 待做                                             |
@@ -205,6 +205,7 @@ OPENAI_API_KEY=                        # 或 DEEPSEEK_API_KEY / DASHSCOPE_API_KE
 - **数据库表**：实际为 `posts` + `settings`（无 `profiles`）。
 - **RLS**：改为"**已发布文章公开可读** + 服务端表 owner 绕过 RLS"；不再依赖 `auth.jwt()`（因已不用 Supabase Auth）。
 - **代理**：境内访问 GitHub 不稳定，已加 `instrumentation` + `customFetch` 重试，通过 `HTTPS_PROXY` 走本地代理。
+- **S5 已完工**：CRUD 全链路（列表/新建/编辑/删除 + zod 校验 + slug 唯一化 + @mdxeditor 动态加载）已实现；唯一缺口：schema 已有 `cover_image` 字段，但表单未接入上传/输入。
 
 ## 12. 待定 / 需讨论的点
 

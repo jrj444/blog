@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "jiangruijian's blog",
-  description: "jiangruijian's blog",
+  title: {
+    default: "jiangruijian's blog",
+    template: "%s · jiangruijian's blog",
+  },
+  description: "jiangruijian 的个人技术博客,记录开发路上的思考与实践。",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -80,8 +80,9 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 @layer base {
@@ -90,5 +91,284 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* ===== 文章正文排版(.markdown-body,配合 src/components/blog/markdown.tsx)===== */
+@layer components {
+  .markdown-body {
+    font-size: 1rem;
+    line-height: 1.8;
+    overflow-wrap: break-word;
+  }
+
+  .markdown-body > :first-child {
+    margin-top: 0;
+  }
+  .markdown-body > :last-child {
+    margin-bottom: 0;
+  }
+
+  /* 标题 */
+  .markdown-body h1,
+  .markdown-body h2,
+  .markdown-body h3,
+  .markdown-body h4,
+  .markdown-body h5,
+  .markdown-body h6 {
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    color: hsl(var(--foreground));
+  }
+  .markdown-body h1 {
+    font-size: 1.6rem;
+    margin: 2.5rem 0 1.25rem;
+  }
+  .markdown-body h2 {
+    font-size: 1.3rem;
+    margin: 2.5rem 0 1.125rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+  .markdown-body h3 {
+    font-size: 1.125rem;
+    margin: 2rem 0 1rem;
+  }
+  .markdown-body h4 {
+    font-size: 1rem;
+    margin: 1.75rem 0 0.875rem;
+  }
+
+  /* 段落与行内元素 */
+  .markdown-body p {
+    margin: 1rem 0;
+  }
+  .markdown-body a {
+    color: hsl(var(--foreground));
+    font-weight: 500;
+    text-decoration: underline;
+    text-decoration-color: hsl(var(--muted-foreground) / 0.45);
+    text-underline-offset: 0.22em;
+    transition: text-decoration-color 0.15s ease;
+  }
+  .markdown-body a:hover {
+    text-decoration-color: hsl(var(--foreground));
+  }
+  .markdown-body strong {
+    font-weight: 600;
+  }
+  .markdown-body :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: hsl(var(--muted));
+    border-radius: 0.35em;
+    padding: 0.2em 0.4em;
+  }
+
+  /* 列表 */
+  .markdown-body ul {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+    list-style: disc;
+  }
+  .markdown-body ol {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+    list-style: decimal;
+  }
+  .markdown-body li {
+    margin: 0.375rem 0;
+  }
+  .markdown-body li::marker {
+    color: hsl(var(--muted-foreground));
+  }
+  .markdown-body li > ul,
+  .markdown-body li > ol {
+    margin: 0.25rem 0;
+  }
+
+  /* 引用 */
+  .markdown-body blockquote {
+    margin: 1.25rem 0;
+    padding: 0.125rem 0 0.125rem 1rem;
+    border-left: 3px solid hsl(var(--primary) / 0.18);
+    color: hsl(var(--muted-foreground));
+  }
+  .markdown-body blockquote > :first-child {
+    margin-top: 0;
+  }
+  .markdown-body blockquote > :last-child {
+    margin-bottom: 0;
+  }
+
+  /* 分割线 */
+  .markdown-body hr {
+    margin: 2.5rem 0;
+    border: 0;
+    border-top: 1px solid hsl(var(--border));
+  }
+
+  /* 表格(display:block + overflow 让窄屏可以横向滚动) */
+  .markdown-body table {
+    display: block;
+    width: max-content;
+    max-width: 100%;
+    overflow-x: auto;
+    margin: 1.25rem 0;
+    font-size: 0.875rem;
+    border-collapse: collapse;
+  }
+  .markdown-body th,
+  .markdown-body td {
+    border: 1px solid hsl(var(--border));
+    padding: 0.5rem 0.875rem;
+    text-align: left;
+  }
+  .markdown-body th {
+    background: hsl(var(--muted) / 0.5);
+    font-weight: 600;
+  }
+  .markdown-body tr:nth-child(2n) td {
+    background: hsl(var(--muted) / 0.25);
+  }
+
+  .markdown-body img {
+    border-radius: var(--radius-lg);
+  }
+
+  /* 代码块(rehype-pretty-code 输出的 data-* 结构) */
+  .markdown-body figure[data-rehype-pretty-code-figure] {
+    margin: 1.5rem 0;
+    border-radius: var(--radius-lg);
+    border: 1px solid hsl(var(--border));
+    background: #f6f8fa;
+    overflow: hidden;
+  }
+  .markdown-body figure[data-rehype-pretty-code-figure] pre {
+    margin: 0;
+    padding: 1.125rem 0;
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.7;
+  }
+  .markdown-body figure[data-rehype-pretty-code-figure] pre > code {
+    display: grid;
+    min-width: 100%;
+    width: fit-content;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+  }
+  .markdown-body figure[data-rehype-pretty-code-figure] [data-line] {
+    padding: 0 1.25rem;
+  }
+  .markdown-body figure[data-rehype-pretty-code-figure] [data-highlighted-line] {
+    background: hsl(var(--accent));
+  }
+  .markdown-body figcaption[data-rehype-pretty-code-title] {
+    padding: 0.625rem 1.25rem;
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsl(var(--muted) / 0.4);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: hsl(var(--muted-foreground));
+  }
+}
+
+/* ===== 后台编辑器内容区排版(.mdx-editor-content,配合 mdx-editor.tsx)===== */
+/* Tailwind preflight 会清零标题/列表等样式,这里与前台 .markdown-body 对齐,让 Markdown 快捷转换结果可视化。 */
+@layer components {
+  .mdx-editor-content {
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    overflow-wrap: break-word;
+  }
+  .mdx-editor-content > :first-child {
+    margin-top: 0;
+  }
+  .mdx-editor-content h1,
+  .mdx-editor-content h2,
+  .mdx-editor-content h3,
+  .mdx-editor-content h4,
+  .mdx-editor-content h5,
+  .mdx-editor-content h6 {
+    font-weight: 600;
+    line-height: 1.4;
+    color: hsl(var(--foreground));
+  }
+  .mdx-editor-content h1 {
+    font-size: 1.5rem;
+    margin: 1.5rem 0 0.75rem;
+  }
+  .mdx-editor-content h2 {
+    font-size: 1.25rem;
+    margin: 1.5rem 0 0.625rem;
+    padding-bottom: 0.375rem;
+    border-bottom: 1px solid hsl(var(--border));
+  }
+  .mdx-editor-content h3 {
+    font-size: 1.1rem;
+    margin: 1.25rem 0 0.5rem;
+  }
+  .mdx-editor-content h4 {
+    font-size: 1rem;
+    margin: 1rem 0 0.5rem;
+  }
+  .mdx-editor-content p {
+    margin: 0.625rem 0;
+  }
+  .mdx-editor-content a {
+    color: hsl(var(--foreground));
+    text-decoration: underline;
+    text-underline-offset: 0.22em;
+  }
+  .mdx-editor-content :not(pre) > code {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    background: hsl(var(--muted));
+    border-radius: 0.35em;
+    padding: 0.2em 0.4em;
+  }
+  .mdx-editor-content ul {
+    margin: 0.625rem 0;
+    padding-left: 1.5rem;
+    list-style: disc;
+  }
+  .mdx-editor-content ol {
+    margin: 0.625rem 0;
+    padding-left: 1.5rem;
+    list-style: decimal;
+  }
+  .mdx-editor-content li {
+    margin: 0.25rem 0;
+  }
+  .mdx-editor-content blockquote {
+    margin: 0.75rem 0;
+    padding: 0.125rem 0 0.125rem 1rem;
+    border-left: 3px solid hsl(var(--primary) / 0.18);
+    color: hsl(var(--muted-foreground));
+  }
+  .mdx-editor-content hr {
+    margin: 1.25rem 0;
+    border: 0;
+    border-top: 1px solid hsl(var(--border));
+  }
+  .mdx-editor-content pre {
+    margin: 0.75rem 0;
+    padding: 0.875rem 1rem;
+    border-radius: var(--radius-lg);
+    background: hsl(var(--muted) / 0.5);
+    overflow-x: auto;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+  .mdx-editor-content pre code {
+    font-family: inherit;
+    font-size: inherit;
+    background: none;
+    padding: 0;
   }
 }

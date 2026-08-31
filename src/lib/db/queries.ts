@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { posts } from "@/lib/db/schema";
-import { count, eq, desc } from "drizzle-orm";
+import { count, eq, and, desc } from "drizzle-orm";
 import { slugify, type PostInput } from "@/lib/validators/post";
 
 // 后台列表：全部（含草稿），分页
@@ -57,6 +57,13 @@ export function getPostById(id: string) {
 
 export function getPostBySlug(slug: string) {
   return db.query.posts.findFirst({ where: eq(posts.slug, slug) });
+}
+
+// 前台详情：只取已发布，草稿不可见
+export function getPublishedPostBySlug(slug: string) {
+  return db.query.posts.findFirst({
+    where: and(eq(posts.slug, slug), eq(posts.published, true)),
+  });
 }
 
 // 确保 slug 唯一；若已存在（且不是自己），加时间戳后缀

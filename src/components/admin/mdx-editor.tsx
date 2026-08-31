@@ -8,6 +8,7 @@ import {
   thematicBreakPlugin,
   linkPlugin,
   linkDialogPlugin,
+  markdownShortcutPlugin,
   codeBlockPlugin,
   tablePlugin,
   imagePlugin,
@@ -35,7 +36,7 @@ export function MDXEditor({
       markdown={markdown}
       onChange={(md) => onChange(md)}
       placeholder={placeholder}
-      contentEditableClassName="min-h-[300px] outline-none"
+      contentEditableClassName="mdx-editor-content min-h-[300px] outline-none"
       plugins={[
         headingsPlugin(),
         listsPlugin(),
@@ -57,6 +58,9 @@ export function MDXEditor({
             </>
           ),
         }),
+        // Markdown 快捷转换(`## `→H2、`- `→列表、`> `→引用)。
+        // 官方要求:必须放在依赖功能插件的后面(数组末尾),否则不生效。
+        markdownShortcutPlugin(),
       ]}
     />
   );

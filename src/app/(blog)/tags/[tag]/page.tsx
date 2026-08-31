@@ -39,8 +39,10 @@ export default async function TagPage({ params, searchParams }: Props) {
   return (
     <div>
       <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">标签</p>
-        <h1 className="mt-2 break-words text-3xl font-bold tracking-tight">#{tag}</h1>
+        <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
+          标签
+        </p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight break-words">#{tag}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {total > 0 ? `共 ${total} 篇文章` : "该标签下还没有文章"}
         </p>

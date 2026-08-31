@@ -20,11 +20,7 @@ type SearchParams = {
   q?: string | string[];
 };
 
-export default async function PostsPage({
-  searchParams,
-}: {
-  searchParams: Promise<SearchParams>;
-}) {
+export default async function PostsPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const { page: pageParam, q: qParam } = await searchParams;
 
   const rawPage = Array.isArray(pageParam) ? pageParam[0] : pageParam;
@@ -58,14 +54,14 @@ export default async function PostsPage({
         <div className="relative max-w-md">
           <Search
             aria-hidden
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70"
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground/70"
           />
           <input
             type="search"
             name="q"
             defaultValue={q}
             placeholder="搜索文章标题或内容…"
-            className="h-10 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground/70 focus-visible:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+            className="h-10 w-full rounded-md border border-border bg-background pr-3 pl-9 text-sm text-foreground placeholder:text-muted-foreground/70 focus-visible:border-foreground/30 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
           />
         </div>
       </form>

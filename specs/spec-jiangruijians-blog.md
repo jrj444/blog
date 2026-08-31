@@ -175,6 +175,8 @@ SUPABASE_SECRET_KEY=                 # 仅服务端
 DATABASE_URL=
 DATABASE_URL_POOLER=
 
+# Site —— SEO (sitemap/robots/RSS 的绝对域名；生产必填)
+SITE_URL=                            # 未设置时回退 AUTH_URL，再回退 http://localhost:3000
 # AI
 OPENAI_API_KEY=                        # 或 DEEPSEEK_API_KEY / DASHSCOPE_API_KEY
 # AI_BASE_URL=
@@ -183,18 +185,18 @@ OPENAI_API_KEY=                        # 或 DEEPSEEK_API_KEY / DASHSCOPE_API_KE
 
 ## 11. 实施路线图
 
-| 编号 | 任务                                                   | 状态                                             |
-| ---- | ------------------------------------------------------ | ------------------------------------------------ |
-| S1   | create-next-app 骨架，pnpm dev 跑通                    | ✅ 已完成                                        |
-| S2   | 装 Supabase + Drizzle 依赖，写客户端 + 环境变量        | ✅ 已完成                                        |
-| S3   | 创建 Supabase 项目，填真实密钥，Drizzle 建表 + rls.sql | ✅ 已完成（表/RLS/RPC 已就位）                   |
-| S4   | Auth（GitHub OAuth）+ proxy.ts + admin                 | ✅ 已完成（改用 NextAuth；单管理员，邮箱白名单） |
-| S5   | 文章 CRUD + 后台编辑器                                 | ✅ 已完成（封面图字段未接入表单，见偏差说明）    |
-| S6   | 前台列表/详情 + Markdown 渲染                          | 待做                                             |
-| S7   | 标签/搜索/分页/阅读量/评论                             | ⬜ 待做（pg_trgm 索引/阅读量 RPC 已提前铺好；评论改走 Giscus） |
-| S8   | SEO / RSS / 关于页                                     | 待做                                             |
-| S9   | AI 摘要/标签/RAG                                       | ⏸ 延后（暂不做）                                 |
-| S10  | Vercel 部署 + 域名                                     | 待做                                             |
+| 编号 | 任务                                                   | 状态                                                                                                             |
+| ---- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| S1   | create-next-app 骨架，pnpm dev 跑通                    | ✅ 已完成                                                                                                        |
+| S2   | 装 Supabase + Drizzle 依赖，写客户端 + 环境变量        | ✅ 已完成                                                                                                        |
+| S3   | 创建 Supabase 项目，填真实密钥，Drizzle 建表 + rls.sql | ✅ 已完成（表/RLS/RPC 已就位）                                                                                   |
+| S4   | Auth（GitHub OAuth）+ proxy.ts + admin                 | ✅ 已完成（改用 NextAuth；单管理员，邮箱白名单）                                                                 |
+| S5   | 文章 CRUD + 后台编辑器                                 | ✅ 已完成（CRUD + @mdxeditor；另加：后台表格列表、删除二次确认、编辑器工具栏+placeholder；封面图字段未接入表单） |
+| S6   | 前台列表/详情 + Markdown 渲染                          | ✅ 已完成（列表/详情 + react-markdown + remark-gfm + rehype-pretty-code 代码高亮）                               |
+| S7   | 标签/搜索/分页/阅读量/评论                             | ⚠️ 大部分完成（标签聚合/关键词搜索/分页/阅读量已做；评论未做，改走 Giscus）                                      |
+| S8   | SEO / RSS / 关于页                                     | ✅ 已完成（关于页 + 页面级 metadata；已加 sitemap/robots/RSS）                                                   |
+| S9   | AI 摘要/标签/RAG                                       | ⏸ 延后（暂不做）                                                                                                 |
+| S10  | Vercel 部署 + 域名                                     | 待做                                                                                                             |
 
 ### 执行偏差说明（相对原始 spec）
 
@@ -205,7 +207,8 @@ OPENAI_API_KEY=                        # 或 DEEPSEEK_API_KEY / DASHSCOPE_API_KE
 - **数据库表**：实际为 `posts` + `settings`（无 `profiles`）。
 - **RLS**：改为"**已发布文章公开可读** + 服务端表 owner 绕过 RLS"；不再依赖 `auth.jwt()`（因已不用 Supabase Auth）。
 - **代理**：境内访问 GitHub 不稳定，已加 `instrumentation` + `customFetch` 重试，通过 `HTTPS_PROXY` 走本地代理。
-- **S5 已完工**：CRUD 全链路（列表/新建/编辑/删除 + zod 校验 + slug 唯一化 + @mdxeditor 动态加载）已实现；唯一缺口：schema 已有 `cover_image` 字段，但表单未接入上传/输入。
+- **进度更新（本次核对）**：S6 已完成、S7 大部分完成、S8 已完成；剩余待做：评论（Giscus）、AI（延后）、Vercel 部署 + 域名。
+- **S5 已完工**：CRUD 全链路（列表/新建/编辑/删除 + zod 校验 + slug 唯一化 + @mdxeditor 动态加载）已实现；后台文章管理已改为表格展示并加删除二次确认，编辑器已接入 `toolbarPlugin` 工具栏与 `placeholder`；封面图已以 URL 字段接入后台表单（可留空，非空须为有效 URL）；真正的 Supabase Storage 上传仍未接。
 
 ## 12. 待定 / 需讨论的点
 

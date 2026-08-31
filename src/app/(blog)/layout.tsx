@@ -29,7 +29,9 @@ export default async function BlogLayout({ children }: { children: React.ReactNo
       </main>
       <footer className="border-t border-border/60">
         <div className="mx-auto flex max-w-3xl flex-col items-center gap-1 px-4 py-8 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <span>© {new Date().getFullYear()} {"jiangruijian's blog"}</span>
+          <span>
+            © {new Date().getFullYear()} {"jiangruijian's blog"}
+          </span>
           <span>用 Next.js 与 Drizzle 搭建 · 记录与思考</span>
         </div>
       </footer>

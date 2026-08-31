@@ -14,17 +14,18 @@ export default async function HomePage() {
   return (
     <div>
       <section className="pt-6 sm:pt-12">
-        <h1 className="text-4xl font-bold leading-[1.15] tracking-tight sm:text-[2.75rem]">
+        <h1 className="text-4xl leading-[1.15] font-bold tracking-tight sm:text-[2.75rem]">
           写代码,<span className="text-muted-foreground">记录思考。</span>
         </h1>
         <p className="mt-5 max-w-xl text-[15px] leading-7 text-muted-foreground">
-          你好,我是 jiangruijian。这里是我的个人博客,记录我在技术上的探索、踩过的坑,以及一些零碎的思考。
+          你好,我是
+          jiangruijian。这里是我的个人博客,记录我在技术上的探索、踩过的坑,以及一些零碎的思考。
         </p>
       </section>
 
       <section className="mt-16">
         <div className="flex items-baseline justify-between gap-4">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+          <h2 className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
             最新文章
           </h2>
           {hasMore && (

@@ -11,6 +11,7 @@ type Props = {
     slug?: string;
     excerpt?: string;
     contentMd?: string;
+    coverImage?: string;
     tags?: string[];
     published?: boolean;
   };
@@ -55,6 +56,20 @@ export function PostForm({ action, defaultValues }: Props) {
           className="w-full rounded border px-3 py-2"
         />
         {state?.errors?.slug && <p className="text-sm text-destructive">{state.errors.slug[0]}</p>}
+      </div>
+
+      <div className="space-y-1">
+        <label className="text-sm font-medium">封面图 URL（可留空）</label>
+        <input
+          name="coverImage"
+          inputMode="url"
+          placeholder="https://example.com/cover.png"
+          defaultValue={defaultValues?.coverImage ?? ""}
+          className="w-full rounded border px-3 py-2"
+        />
+        {state?.errors?.coverImage && (
+          <p className="text-sm text-destructive">{state.errors.coverImage[0]}</p>
+        )}
       </div>
 
       <div className="space-y-1">

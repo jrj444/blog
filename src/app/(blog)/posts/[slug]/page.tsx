@@ -52,7 +52,7 @@ export default async function PostPage({ params }: Props) {
       </Link>
 
       <header className="mt-6">
-        <h1 className="text-3xl font-bold leading-snug tracking-tight sm:text-4xl sm:leading-tight">
+        <h1 className="text-3xl leading-snug font-bold tracking-tight sm:text-4xl sm:leading-tight">
           {post.title}
         </h1>
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">

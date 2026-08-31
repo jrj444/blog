@@ -43,9 +43,7 @@ export async function listPublishedPosts(params: ListPublishedParams = {}) {
     conditions.push(arrayContains(posts.tags, [tag]));
   }
   if (term) {
-    conditions.push(
-      or(ilike(posts.title, `%${term}%`), ilike(posts.contentMd, `%${term}%`))!,
-    );
+    conditions.push(or(ilike(posts.title, `%${term}%`), ilike(posts.contentMd, `%${term}%`))!);
   }
   const where = and(...conditions);
 
@@ -61,10 +59,7 @@ export async function listPublishedPosts(params: ListPublishedParams = {}) {
     .limit(pageSize)
     .offset(offset);
 
-  const [{ value: total }] = await db
-    .select({ value: count() })
-    .from(posts)
-    .where(where);
+  const [{ value: total }] = await db.select({ value: count() }).from(posts).where(where);
 
   return {
     posts: rows,
@@ -90,6 +85,20 @@ export function getPublishedPostBySlug(slug: string) {
   });
 }
 
+// RSS / sitemap：全部已发布文章（不分页，按时间倒序）
+export async function allPublishedPosts() {
+  return db.select().from(posts).where(eq(posts.published, true)).orderBy(desc(posts.createdAt));
+}
+
+// sitemap：收集已发布文章用到的全部标签
+export async function allTags() {
+  const rows = await db.select({ tags: posts.tags }).from(posts).where(eq(posts.published, true));
+  const set = new Set<string>();
+  for (const row of rows) {
+    for (const tag of row.tags) set.add(tag);
+  }
+  return [...set];
+}
 // 确保 slug 唯一；若已存在（且不是自己），加时间戳后缀
 async function uniqueSlug(slug: string, exceptId?: string) {
   const existing = await getPostBySlug(slug);
@@ -111,7 +120,7 @@ export async function createPost(input: PostInput) {
       contentMd: input.contentMd,
       tags: input.tags,
       published: input.published,
-      coverImage: null,
+      coverImage: input.coverImage || null,
     })
     .returning({ id: posts.id });
 
@@ -130,6 +139,7 @@ export async function updatePost(id: string, input: PostInput) {
       contentMd: input.contentMd,
       tags: input.tags,
       published: input.published,
+      coverImage: input.coverImage || null,
       updatedAt: new Date(),
     })
     .where(eq(posts.id, id))

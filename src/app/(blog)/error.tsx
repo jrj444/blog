@@ -20,9 +20,7 @@ export default function BlogError({
     <div className="flex flex-col items-center gap-3 py-24 text-center">
       <p className="font-mono text-sm text-muted-foreground">500</p>
       <h1 className="text-2xl font-bold tracking-tight">出了点问题</h1>
-      <p className="text-sm text-muted-foreground">
-        页面加载失败,可能是网络波动或服务暂时不可用。
-      </p>
+      <p className="text-sm text-muted-foreground">页面加载失败,可能是网络波动或服务暂时不可用。</p>
       <div className="mt-3 flex items-center gap-3">
         <button
           type="button"

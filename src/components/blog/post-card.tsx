@@ -9,15 +9,15 @@ export function PostCard({ post }: { post: Post }) {
       <div className="flex flex-col gap-1.5 sm:flex-row sm:items-baseline sm:gap-6">
         <time
           dateTime={post.createdAt.toISOString()}
-          className="shrink-0 text-xs tabular-nums text-muted-foreground sm:w-24 sm:text-[13px]"
+          className="shrink-0 text-xs text-muted-foreground tabular-nums sm:w-24 sm:text-[13px]"
         >
           {formatDate(post.createdAt, { month: "long", day: "numeric" })}
         </time>
         <div className="min-w-0 flex-1">
-          <h2 className="text-base font-semibold leading-snug tracking-tight sm:text-lg">
+          <h2 className="text-base leading-snug font-semibold tracking-tight sm:text-lg">
             <Link
               href={`/posts/${post.slug}`}
-              className="text-foreground underline-offset-4 decoration-border transition-colors group-hover:underline group-hover:decoration-foreground/50"
+              className="text-foreground decoration-border underline-offset-4 transition-colors group-hover:underline group-hover:decoration-foreground/50"
             >
               {post.title}
             </Link>

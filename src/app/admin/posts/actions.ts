@@ -24,6 +24,7 @@ function parseForm(formData: FormData): PostInput {
     slug,
     excerpt: String(formData.get("excerpt") ?? ""),
     contentMd: String(formData.get("contentMd") ?? ""),
+    coverImage: String(formData.get("coverImage") ?? "").trim(),
     tags: String(formData.get("tags") ?? "")
       .split(",")
       .map((t) => t.trim())

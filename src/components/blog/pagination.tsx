@@ -15,7 +15,7 @@ export function Pagination({
   return (
     <nav aria-label="分页" className="mt-10 flex items-center justify-between">
       <PaginationLink href={prevHref}>← 上一页</PaginationLink>
-      <span className="text-sm tabular-nums text-muted-foreground">
+      <span className="text-sm text-muted-foreground tabular-nums">
         {page} / {pageCount}
       </span>
       <PaginationLink href={nextHref}>下一页 →</PaginationLink>

@@ -1,0 +1,16 @@
+# 依赖 / 构建产物
+node_modules
+.next
+out
+build
+dist
+
+# 自动生成 / 二进制
+pnpm-lock.yaml
+next-env.d.ts
+drizzle
+public
+
+# 环境 / SQL 不参与格式化
+.env*
+supabase/**/*.sql

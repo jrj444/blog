@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { Feather } from "lucide-react";
+import { Feather, Search } from "lucide-react";
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 import { listPublishedPosts } from "@/lib/db/queries";
 import { PostCard } from "@/components/blog/post-card";
+import { Pagination } from "@/components/blog/pagination";
 
 // 页面数据来自数据库,每次请求实时渲染(构建期不访问数据库)。
 export const dynamic = "force-dynamic";
@@ -15,27 +15,72 @@ export const metadata: Metadata = {
 
 const PAGE_SIZE = 10;
 
+type SearchParams = {
+  page?: string | string[];
+  q?: string | string[];
+};
+
 export default async function PostsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<SearchParams>;
 }) {
-  const { page: pageParam } = await searchParams;
-  const raw = Array.isArray(pageParam) ? pageParam[0] : pageParam;
-  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
-  const page = Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+  const { page: pageParam, q: qParam } = await searchParams;
 
-  const { posts, total, hasMore } = await listPublishedPosts(page, PAGE_SIZE);
+  const rawPage = Array.isArray(pageParam) ? pageParam[0] : pageParam;
+  const parsedPage = rawPage ? Number.parseInt(rawPage, 10) : Number.NaN;
+  const page = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+
+  const q = (Array.isArray(qParam) ? qParam[0] : qParam)?.trim() || undefined;
+
+  const { posts, total, hasMore } = await listPublishedPosts({ page, pageSize: PAGE_SIZE, q });
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // 分页/回到第一页的链接都要保留搜索词。
+  const buildPageHref = (p: number) => {
+    const params = new URLSearchParams();
+    if (p > 1) params.set("page", String(p));
+    if (q) params.set("q", q);
+    const query = params.toString();
+    return query ? `/posts?${query}` : "/posts";
+  };
 
   return (
     <div>
       <header>
         <h1 className="text-3xl font-bold tracking-tight">文章</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {total > 0 ? `共 ${total} 篇文章` : "还没有已发布的文章"}
+          {q ? null : total > 0 ? `共 ${total} 篇文章` : "还没有已发布的文章"}
         </p>
       </header>
+
+      <form action="/posts" role="search" className="mt-6">
+        <div className="relative max-w-md">
+          <Search
+            aria-hidden
+            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground/70"
+          />
+          <input
+            type="search"
+            name="q"
+            defaultValue={q}
+            placeholder="搜索文章标题或内容…"
+            className="h-10 w-full rounded-md border border-border bg-background pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground/70 focus-visible:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+          />
+        </div>
+      </form>
+
+      {q && (
+        <p className="mt-3 text-sm text-muted-foreground">
+          搜索「{q}」的结果,共 {total} 篇 ·{" "}
+          <Link
+            href="/posts"
+            className="underline underline-offset-4 transition-colors hover:text-foreground"
+          >
+            清除搜索
+          </Link>
+        </p>
+      )}
 
       {posts.length > 0 ? (
         <div className="mt-6 divide-y divide-border/70">
@@ -46,7 +91,21 @@ export default async function PostsPage({
       ) : (
         <div className="mt-8 flex flex-col items-center gap-2 rounded-lg border border-dashed px-6 py-16 text-center">
           <Feather aria-hidden className="mb-1 size-5 text-muted-foreground/50" />
-          {total === 0 ? (
+          {q && total === 0 ? (
+            <>
+              <p className="text-sm font-medium">没有找到相关文章</p>
+              <p className="text-xs text-muted-foreground">
+                换几个关键词试试,或{" "}
+                <Link
+                  href="/posts"
+                  className="underline underline-offset-4 transition-colors hover:text-foreground"
+                >
+                  清除搜索
+                </Link>
+                。
+              </p>
+            </>
+          ) : total === 0 ? (
             <>
               <p className="text-sm font-medium">还没有已发布的文章</p>
               <p className="text-xs text-muted-foreground">文章发布后,会第一时间出现在这里。</p>
@@ -57,7 +116,7 @@ export default async function PostsPage({
               <p className="text-xs text-muted-foreground">
                 试试{" "}
                 <Link
-                  href="/posts"
+                  href={buildPageHref(1)}
                   className="underline underline-offset-4 transition-colors hover:text-foreground"
                 >
                   回到第一页
@@ -70,37 +129,13 @@ export default async function PostsPage({
       )}
 
       {posts.length > 0 && (
-        <nav aria-label="分页" className="mt-10 flex items-center justify-between">
-          <PaginationLink href={page > 1 ? (page === 2 ? "/posts" : `/posts?page=${page - 1}`) : null}>
-            ← 上一页
-          </PaginationLink>
-          <span className="text-sm tabular-nums text-muted-foreground">
-            {page} / {pageCount}
-          </span>
-          <PaginationLink href={hasMore ? `/posts?page=${page + 1}` : null}>下一页 →</PaginationLink>
-        </nav>
+        <Pagination
+          page={page}
+          pageCount={pageCount}
+          prevHref={page > 1 ? buildPageHref(page - 1) : null}
+          nextHref={hasMore ? buildPageHref(page + 1) : null}
+        />
       )}
     </div>
-  );
-}
-
-function PaginationLink({ href, children }: { href: string | null; children: ReactNode }) {
-  if (!href) {
-    return (
-      <span
-        aria-disabled
-        className="cursor-not-allowed rounded-md border border-border px-3.5 py-1.5 text-sm text-muted-foreground/40"
-      >
-        {children}
-      </span>
-    );
-  }
-  return (
-    <Link
-      href={href}
-      className="rounded-md border border-border px-3.5 py-1.5 text-sm text-muted-foreground transition-colors hover:border-foreground/25 hover:text-foreground"
-    >
-      {children}
-    </Link>
   );
 }

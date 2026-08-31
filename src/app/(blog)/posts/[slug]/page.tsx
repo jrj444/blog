@@ -1,11 +1,12 @@
 import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Eye } from "lucide-react";
 import type { Metadata } from "next";
 import { getPublishedPostBySlug } from "@/lib/db/queries";
 import { Markdown } from "@/components/blog/markdown";
 import { TagBadge } from "@/components/blog/tag-badge";
+import { ViewTracker } from "@/components/blog/view-tracker";
 import { formatDate } from "@/lib/format-date";
 
 // 页面数据来自数据库,每次请求实时渲染(构建期不访问数据库)。
@@ -58,6 +59,10 @@ export default async function PostPage({ params }: Props) {
           <time dateTime={post.createdAt.toISOString()} className="tabular-nums">
             {formatDate(post.createdAt)}
           </time>
+          <span className="inline-flex items-center gap-1 tabular-nums">
+            <Eye aria-hidden className="size-3.5" />
+            {post.views} 次阅读
+          </span>
           {post.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {post.tags.map((tag) => (
@@ -81,6 +86,8 @@ export default async function PostPage({ params }: Props) {
           返回文章列表
         </Link>
       </footer>
+
+      <ViewTracker postId={post.id} />
     </article>
   );
 }

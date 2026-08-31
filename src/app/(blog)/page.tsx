@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const HOME_POST_COUNT = 5;
 
 export default async function HomePage() {
-  const { posts, hasMore } = await listPublishedPosts(1, HOME_POST_COUNT);
+  const { posts, hasMore } = await listPublishedPosts({ page: 1, pageSize: HOME_POST_COUNT });
 
   return (
     <div>

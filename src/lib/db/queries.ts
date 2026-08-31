@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { posts } from "@/lib/db/schema";
-import { count, eq, and, desc } from "drizzle-orm";
+import { count, eq, and, or, ilike, arrayContains, desc, sql } from "drizzle-orm";
 import { slugify, type PostInput } from "@/lib/validators/post";
 
 // 后台列表：全部（含草稿），分页
@@ -25,22 +25,46 @@ export async function listPosts(page = 1, pageSize = 10) {
   };
 }
 
-// 前台列表：只取已发布，分页
-export async function listPublishedPosts(page = 1, pageSize = 10) {
+// 前台列表:只取已发布,支持分页 / 标签过滤 / 关键词搜索(pg_trgm)
+export type ListPublishedParams = {
+  page?: number;
+  pageSize?: number;
+  tag?: string;
+  q?: string;
+};
+
+export async function listPublishedPosts(params: ListPublishedParams = {}) {
+  const { page = 1, pageSize = 10, tag, q } = params;
   const offset = (page - 1) * pageSize;
+  const term = q?.trim();
+
+  const conditions = [eq(posts.published, true)];
+  if (tag) {
+    conditions.push(arrayContains(posts.tags, [tag]));
+  }
+  if (term) {
+    conditions.push(
+      or(ilike(posts.title, `%${term}%`), ilike(posts.contentMd, `%${term}%`))!,
+    );
+  }
+  const where = and(...conditions);
 
   const rows = await db
     .select()
     .from(posts)
-    .where(eq(posts.published, true))
-    .orderBy(desc(posts.createdAt))
+    .where(where)
+    .orderBy(
+      // 搜索时标题命中优先,再按时间倒序;非搜索按时间倒序
+      term ? desc(sql`${posts.title} ilike ${`%${term}%`}`) : desc(posts.createdAt),
+      desc(posts.createdAt),
+    )
     .limit(pageSize)
     .offset(offset);
 
   const [{ value: total }] = await db
     .select({ value: count() })
     .from(posts)
-    .where(eq(posts.published, true));
+    .where(where);
 
   return {
     posts: rows,
@@ -116,4 +140,9 @@ export async function updatePost(id: string, input: PostInput) {
 
 export async function deletePost(id: string) {
   await db.delete(posts).where(eq(posts.id, id));
+}
+
+// 阅读量 +1:走 security definer RPC(仅已发布文章生效,RLS 安全)
+export async function incrementViews(postId: string) {
+  await db.execute(sql`select public.increment_post_views(${postId}::uuid)`);
 }

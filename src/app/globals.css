@@ -2,53 +2,56 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 240 10% 3.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 240 10% 3.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 240 10% 3.9%;
-  --primary: 240 5.9% 10%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 240 4.8% 95.9%;
-  --secondary-foreground: 240 5.9% 10%;
-  --muted: 240 4.8% 95.9%;
-  --muted-foreground: 240 3.8% 46.1%;
-  --accent: 240 4.8% 95.9%;
-  --accent-foreground: 240 5.9% 10%;
-  --destructive: 0 84.2% 60.2%;
+  --background: 60 8% 95%;
+  --foreground: 200 6% 9%;
+  --card: 60 17% 98%;
+  --card-foreground: 200 6% 9%;
+  --popover: 60 17% 98%;
+  --popover-foreground: 200 6% 9%;
+  --primary: 203 15% 28%;
+  --primary-foreground: 60 8% 95%;
+  --secondary: 210 8% 90%;
+  --secondary-foreground: 200 6% 9%;
+  --muted: 60 10% 90%;
+  --muted-foreground: 160 1% 55%;
+  --accent: 210 8% 90%;
+  --accent-foreground: 203 15% 28%;
+  --destructive: 0 74% 55%;
   --destructive-foreground: 0 0% 98%;
-  --border: 240 5.9% 90%;
-  --input: 240 5.9% 90%;
-  --ring: 240 10% 3.9%;
-  --chart-1: 12 76% 61%;
-  --chart-2: 173 58% 39%;
-  --chart-3: 197 37% 24%;
-  --chart-4: 43 74% 66%;
-  --chart-5: 27 87% 67%;
+  --border: 60 7% 86%;
+  --input: 60 7% 86%;
+  --ring: 203 15% 28%;
+  --accent-2: 33 10% 38%;
+  --chart-1: 203 15% 28%;
+  --chart-2: 33 10% 38%;
+  --chart-3: 210 5% 8%;
+  --chart-4: 160 1% 55%;
+  --chart-5: 60 7% 86%;
   --radius: 0.5rem;
+  --wrap: 1160px;
 }
 
 .dark {
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 98%;
-  --card: 240 10% 3.9%;
-  --card-foreground: 0 0% 98%;
-  --popover: 240 10% 3.9%;
-  --popover-foreground: 0 0% 98%;
-  --primary: 0 0% 98%;
-  --primary-foreground: 240 5.9% 10%;
-  --secondary: 240 3.7% 15.9%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 240 3.7% 15.9%;
-  --muted-foreground: 240 5% 64.9%;
-  --accent: 240 3.7% 15.9%;
-  --accent-foreground: 0 0% 98%;
+  --background: 210 5% 8%;
+  --foreground: 60 9% 91%;
+  --card: 210 7% 11%;
+  --card-foreground: 60 9% 91%;
+  --popover: 210 7% 11%;
+  --popover-foreground: 60 9% 91%;
+  --primary: 205 15% 62%;
+  --primary-foreground: 210 5% 8%;
+  --secondary: 200 9% 13%;
+  --secondary-foreground: 205 15% 62%;
+  --muted: 210 5% 15%;
+  --muted-foreground: 100 1% 48%;
+  --accent: 200 9% 13%;
+  --accent-foreground: 205 15% 62%;
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
-  --border: 240 3.7% 15.9%;
-  --input: 240 3.7% 15.9%;
-  --ring: 240 4.9% 83.9%;
+  --border: 210 5% 17%;
+  --input: 210 5% 17%;
+  --ring: 205 15% 62%;
+  --accent-2: 33 10% 56%;
 }
 
 @theme inline {
@@ -71,6 +74,7 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
+  --color-accent-2: hsl(var(--accent-2));
   --color-chart-1: hsl(var(--chart-1));
   --color-chart-2: hsl(var(--chart-2));
   --color-chart-3: hsl(var(--chart-3));
@@ -84,6 +88,9 @@
     var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-serif:
+    var(--font-serif), "Songti SC", "Noto Serif SC", "Source Han Serif SC", Georgia,
+    "Iowan Old Style", serif;
 }
 
 @layer base {
@@ -92,6 +99,60 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* ===== 装饰层:顶部渐变 wash + 胶片噪点 grain ===== */
+.site-wash {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 640px;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(760px 380px at 14% -8%, hsl(var(--accent)), transparent 62%),
+    radial-gradient(620px 320px at 92% 6%, hsl(var(--primary) / 0.07), transparent 60%);
+}
+.site-grain {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.32;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.42'/%3E%3C/svg%3E");
+}
+.dark .site-grain {
+  opacity: 0.14;
+  mix-blend-mode: screen;
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-grain,
+  .site-wash {
+    display: none;
+  }
+}
+
+/* ===== 滚动入场 ===== */
+.rv {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
+}
+.rv.in {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rv {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }
 
@@ -117,6 +178,7 @@
   .markdown-body h4,
   .markdown-body h5,
   .markdown-body h6 {
+    font-family: var(--font-serif);
     font-weight: 600;
     line-height: 1.4;
     letter-spacing: -0.01em;
@@ -236,6 +298,8 @@
 
   .markdown-body img {
     border-radius: var(--radius-lg);
+    max-width: 100%;
+    height: auto;
   }
 
   /* 代码块(rehype-pretty-code 输出的 data-* 结构) */
@@ -243,7 +307,7 @@
     margin: 1.5rem 0;
     border-radius: var(--radius-lg);
     border: 1px solid hsl(var(--border));
-    background: #f6f8fa;
+    background: hsl(var(--muted) / 0.4);
     overflow: hidden;
   }
   .markdown-body figure[data-rehype-pretty-code-figure] pre {
@@ -261,6 +325,16 @@
     font-family: inherit;
     font-size: inherit;
     line-height: inherit;
+    color: var(--shiki-light, hsl(var(--foreground)));
+  }
+  .markdown-body figure[data-rehype-pretty-code-figure] pre > code span {
+    color: var(--shiki-light, inherit);
+  }
+  .dark .markdown-body figure[data-rehype-pretty-code-figure] pre > code {
+    color: var(--shiki-dark, hsl(var(--foreground)));
+  }
+  .dark .markdown-body figure[data-rehype-pretty-code-figure] pre > code span {
+    color: var(--shiki-dark, inherit);
   }
   .markdown-body figure[data-rehype-pretty-code-figure] [data-line] {
     padding: 0 1.25rem;
@@ -295,6 +369,7 @@
   .mdx-editor-content h4,
   .mdx-editor-content h5,
   .mdx-editor-content h6 {
+    font-family: var(--font-serif);
     font-weight: 600;
     line-height: 1.4;
     color: hsl(var(--foreground));

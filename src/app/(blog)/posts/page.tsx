@@ -9,8 +9,8 @@ import { Pagination } from "@/components/blog/pagination";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "文章",
-  description: "全部已发布的技术文章。",
+  title: "Archive",
+  description: "All published posts.",
 };
 
 const PAGE_SIZE = 10;
@@ -44,7 +44,7 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
   return (
     <div>
       <header>
-        <h1 className="text-3xl font-bold tracking-tight">文章</h1>
+        <h1 className="font-serif text-3xl font-bold tracking-tight">Archive</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {q ? null : total > 0 ? `共 ${total} 篇文章` : "还没有已发布的文章"}
         </p>

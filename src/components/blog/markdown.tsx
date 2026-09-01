@@ -23,7 +23,7 @@ export async function Markdown({ content, className }: MarkdownProps) {
           [
             rehypePrettyCode,
             {
-              theme: "github-light",
+              theme: { light: "github-light", dark: "github-dark" },
               keepBackground: false,
               bypassInlineCode: true,
               defaultLang: "plaintext",

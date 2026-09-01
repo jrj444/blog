@@ -42,7 +42,7 @@ export default async function PostPage({ params }: Props) {
   }
 
   return (
-    <article>
+    <article className="mx-auto max-w-3xl">
       <Link
         href="/posts"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -52,10 +52,10 @@ export default async function PostPage({ params }: Props) {
       </Link>
 
       <header className="mt-6">
-        <h1 className="text-3xl leading-snug font-bold tracking-tight sm:text-4xl sm:leading-tight">
+        <h1 className="font-serif text-3xl leading-snug font-bold tracking-tight sm:text-4xl sm:leading-tight">
           {post.title}
         </h1>
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
           <time dateTime={post.createdAt.toISOString()} className="tabular-nums">
             {formatDate(post.createdAt)}
           </time>

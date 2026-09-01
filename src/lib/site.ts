@@ -3,8 +3,9 @@
 const siteUrl = process.env.SITE_URL ?? process.env.AUTH_URL ?? "http://localhost:3000";
 
 export const siteConfig = {
-  name: "jiangruijian's blog",
-  description: "jiangruijian 的个人技术博客，记录开发路上的思考与实践。",
+  name: "JIANG RUIJIAN",
+  description:
+    "Notes on engineering trade-offs, mistakes, and some days that have nothing to do with code.",
   url: siteUrl.replace(/\/+$/, ""), // 去掉末尾斜杠，方便拼路径
 } as const;
 

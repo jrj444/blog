@@ -156,3 +156,38 @@ export async function deletePost(id: string) {
 export async function incrementViews(postId: string) {
   await db.execute(sql`select public.increment_post_views(${postId}::uuid)`);
 }
+
+// 前台首页统计:总数 / 本年发布数 / 最近更新时间
+export async function getPublishedStats() {
+  const [{ total }] = await db
+    .select({ total: count() })
+    .from(posts)
+    .where(eq(posts.published, true));
+
+  const year = new Date().getFullYear();
+  const [{ thisYear }] = await db
+    .select({ thisYear: count() })
+    .from(posts)
+    .where(and(eq(posts.published, true), sql`extract(year from ${posts.createdAt}) = ${year}`));
+
+  const [latest] = await db
+    .select({ updatedAt: posts.updatedAt })
+    .from(posts)
+    .where(eq(posts.published, true))
+    .orderBy(desc(posts.updatedAt))
+    .limit(1);
+
+  return { total, thisYear, lastUpdated: latest?.updatedAt ?? null };
+}
+
+// 标签云:从已发布文章聚合标签及数量
+export async function listTagsWithCounts() {
+  const rows = await db.select({ tags: posts.tags }).from(posts).where(eq(posts.published, true));
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    for (const tag of row.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, "zh-CN"));
+}

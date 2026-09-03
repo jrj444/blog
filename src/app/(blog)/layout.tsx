@@ -14,15 +14,21 @@ function SocialIcon({
   href,
   label,
   children,
+  target,
+  rel,
 }: {
   href: string;
   label: string;
   children: React.ReactNode;
+  target?: string;
+  rel?: string;
 }) {
   return (
     <a
       href={href}
       aria-label={label}
+      target={target}
+      rel={rel}
       className="grid size-[34px] place-items-center rounded-lg border border-border text-muted-foreground transition-all hover:-translate-y-0.5 hover:border-primary hover:text-primary"
     >
       {children}
@@ -102,7 +108,7 @@ export default async function BlogLayout({ children }: { children: React.ReactNo
                 Life cannot be replayed, so why not be greedy
               </p>
               <div className="mt-6 flex gap-2">
-                <SocialIcon href="#" label="GitHub">
+                <SocialIcon href="https://github.com/jrj444" label="GitHub" target="_blank" rel="noopener noreferrer">
                   <svg
                     viewBox="0 0 24 24"
                     aria-hidden
@@ -114,7 +120,7 @@ export default async function BlogLayout({ children }: { children: React.ReactNo
                 <SocialIcon href="/feed.xml" label="RSS">
                   <Rss className="size-[15px]" />
                 </SocialIcon>
-                <SocialIcon href="mailto:hi@jiangruijian.top" label="邮箱">
+                <SocialIcon href="mailto:jrj444@foxmail.com" label="邮箱">
                   <Mail className="size-[15px]" />
                 </SocialIcon>
               </div>

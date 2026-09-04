@@ -130,7 +130,7 @@ export default async function BlogLayout({ children }: { children: React.ReactNo
           </div>
 
           <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-5 pb-2 font-mono text-[10.5px] tracking-[0.1em] text-muted-foreground uppercase sm:mt-16">
-            <span>© {new Date().getFullYear()} JIANG RUIJIAN · jiangruijian.top</span>
+            <span>© {new Date().getFullYear()} JIANG RUIJIAN · jiangruijian.com</span>
             <span>Built with Next.js · Hosted on Vercel</span>
           </div>
         </div>

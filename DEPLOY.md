@@ -1,4 +1,4 @@
-> ⚠️ 本文以 jiangruijian.top 为例，请替换为你购买的真实域名。
+> 正式域名：jiangruijian.com。
 
 # 部署指南：Vercel 托管 + Cloudflare 域名 / DNS / SSL
 
@@ -43,8 +43,8 @@ git push origin main
 | `AUTH_GITHUB_ID` | GitHub OAuth App Client ID | 必填 |
 | `AUTH_GITHUB_SECRET` | GitHub OAuth App Client Secret | 必填 |
 | `AUTH_SECRET` | 新生成的强密钥 `openssl rand -base64 32` | 必填，生产请换新的 |
-| `AUTH_URL` | `https://jiangruijian.top` | Auth.js 回调/站点地址 |
-| `SITE_URL` | `https://jiangruijian.top` | sitemap/robots/RSS/metadata 用 |
+| `AUTH_URL` | `https://jiangruijian.com` | Auth.js 回调/站点地址 |
+| `SITE_URL` | `https://jiangruijian.com` | sitemap/robots/RSS/metadata 用 |
 | `ADMIN_EMAILS` | 你的 GitHub 邮箱（逗号分隔） | 唯一可登录后台 |
 
 > ⚠️ **千万不要**把 `HTTPS_PROXY` / `HTTP_PROXY` 加进 Vercel。
@@ -61,8 +61,8 @@ git push origin main
 
 **项目 → Settings → Domains → Add**，添加：
 
-- `jiangruijian.top`（根域）
-- `www.jiangruijian.top`
+- `jiangruijian.com`（根域）
+- `www.jiangruijian.com`
 
 Vercel 会提示你去 DNS 加记录。照下一节做。
 
@@ -70,7 +70,7 @@ Vercel 会提示你去 DNS 加记录。照下一节做。
 
 ## 4. Cloudflare DNS 记录
 
-进入 **Cloudflare Dash → jiangruijian.top → DNS → Records**，添加：
+进入 **Cloudflare Dash → jiangruijian.com → DNS → Records**，添加：
 
 | 类型 | 名称 | 内容 | 代理 |
 |---|---|---|---|
@@ -102,10 +102,10 @@ Vercel 会提示你去 DNS 加记录。照下一节做。
 **GitHub → Settings → Developer settings → OAuth Apps → 你的应用 → Authorization callback URL**：
 
 ```
-https://jiangruijian.top/api/auth/callback/github
+https://jiangruijian.com/api/auth/callback/github
 ```
 
-（如果还没建 GitHub OAuth App，就建一个，`Homepage URL` 也填 `https://jiangruijian.top`。）
+（如果还没建 GitHub OAuth App，就建一个，`Homepage URL` 也填 `https://jiangruijian.com`。）
 
 ---
 
@@ -113,8 +113,8 @@ https://jiangruijian.top/api/auth/callback/github
 
 回到 Vercel 第一次 **Deploy**，等构建成功。然后验证：
 
-- 访问 `https://jiangruijian.top` → 返回 200，页面正常。
-- `https://jiangruijian.top/feed.xml`、`/sitemap.xml`、`/robots.txt` 可访问。
+- 访问 `https://jiangruijian.com` → 返回 200，页面正常。
+- `https://jiangruijian.com/feed.xml`、`/sitemap.xml`、`/robots.txt` 可访问。
 - 访问 `/admin` → 应被 `proxy.ts` 重定向到 `/auth/signin`。
 - 用你的 GitHub 登录，应能进入后台并管理文章。
 

@@ -191,3 +191,35 @@ export async function listTagsWithCounts() {
     .map(([tag, count]) => ({ tag, count }))
     .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, "zh-CN"));
 }
+
+// ---------- 后台仪表盘 ----------
+
+// 统计:已发布 / 草稿 / 今年发布 / 总阅读量
+export async function getDashboardStats() {
+  const [{ published }] = await db
+    .select({ published: count() })
+    .from(posts)
+    .where(eq(posts.published, true));
+
+  const [{ drafts }] = await db
+    .select({ drafts: count() })
+    .from(posts)
+    .where(eq(posts.published, false));
+
+  const year = new Date().getFullYear();
+  const [{ thisYear }] = await db
+    .select({ thisYear: count() })
+    .from(posts)
+    .where(and(eq(posts.published, true), sql`extract(year from ${posts.createdAt}) = ${year}`));
+
+  const [{ views }] = await db
+    .select({ views: sql<number>`coalesce(sum(${posts.views}), 0)::int` })
+    .from(posts);
+
+  return { published, drafts, thisYear, views };
+}
+
+// 最近更新的文章(含草稿),按更新时间倒序
+export async function listRecentPosts(limit = 5) {
+  return db.select().from(posts).orderBy(desc(posts.updatedAt)).limit(limit);
+}

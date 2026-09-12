@@ -1,4 +1,4 @@
-import { listPublishedPosts, getPublishedStats, allTags } from "@/lib/db/queries";
+import { listPublishedPosts, getPublishedStats } from "@/lib/db/queries";
 import { HomeFeed } from "@/components/blog/home-feed";
 import { Reveal } from "@/components/blog/reveal";
 
@@ -18,18 +18,21 @@ function Stat({ n, l }: { n: number | string; l: string }) {
   );
 }
 
+/** "MM.DD"；入参是缓存返回的 ISO 字符串，在边界处才转成 Date */
+function formatMonthDay(iso: string | null) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default async function HomePage() {
-  const [{ posts, hasMore }, stats, allTagNames] = await Promise.all([
+  const [{ posts, hasMore }, stats] = await Promise.all([
     listPublishedPosts({ page: 1, pageSize: HOME_POST_COUNT }),
     getPublishedStats(),
-    allTags(),
   ]);
 
-  const updatedLabel = stats.lastUpdated
-    ? `${String(stats.lastUpdated.getMonth() + 1).padStart(2, "0")}.${String(
-        stats.lastUpdated.getDate(),
-      ).padStart(2, "0")}`
-    : "—";
+  const updatedLabel = formatMonthDay(stats.lastUpdated);
 
   return (
     <div>
@@ -56,7 +59,7 @@ export default async function HomePage() {
       </section>
 
       <section className="mt-16">
-        <HomeFeed posts={posts} hasMore={hasMore} allTags={allTagNames} />
+        <HomeFeed posts={posts} hasMore={hasMore} />
       </section>
     </div>
   );

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Feather } from "lucide-react";
-import type { Post } from "@/lib/db/schema";
+import type { PostListItem } from "@/lib/db/queries";
 import { cn } from "@/lib/utils";
 import { PostCard } from "./post-card";
 
@@ -15,17 +15,14 @@ const chip = (active: boolean) =>
       : "border-border text-muted-foreground hover:border-accent-2 hover:text-accent-2",
   );
 
-export function HomeFeed({
-  posts,
-  hasMore,
-  allTags,
-}: {
-  posts: Post[];
-  hasMore: boolean;
-  allTags: string[];
-}) {
+export function HomeFeed({ posts, hasMore }: { posts: PostListItem[]; hasMore: boolean }) {
   const [active, setActive] = useState<string | null>(null);
   const filtered = active ? posts.filter((p) => p.tags.includes(active)) : posts;
+
+  // 标签筛选只在当前这一页内生效；标签全集来自当前页文章，避免首页多打一次全表查询。
+  const allTags = [...new Set(posts.flatMap((p) => p.tags))].sort((a, b) =>
+    a.localeCompare(b, "zh-CN"),
+  );
 
   return (
     <section>

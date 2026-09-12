@@ -7,7 +7,7 @@ import { getPublishedPostBySlug } from "@/lib/db/queries";
 import { Markdown } from "@/components/blog/markdown";
 import { TagBadge } from "@/components/blog/tag-badge";
 import { ViewTracker } from "@/components/blog/view-tracker";
-import { formatDate } from "@/lib/format-date";
+import { formatDate, toIsoString } from "@/lib/format-date";
 
 // 页面数据来自数据库,每次请求实时渲染(构建期不访问数据库)。
 export const dynamic = "force-dynamic";
@@ -56,7 +56,7 @@ export default async function PostPage({ params }: Props) {
           {post.title}
         </h1>
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
-          <time dateTime={post.createdAt.toISOString()} className="tabular-nums">
+          <time dateTime={toIsoString(post.createdAt)} className="tabular-nums">
             {formatDate(post.createdAt)}
           </time>
           <span className="inline-flex items-center gap-1 tabular-nums">

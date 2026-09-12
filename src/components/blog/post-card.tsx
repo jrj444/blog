@@ -1,18 +1,22 @@
 import Link from "next/link";
-import type { Post } from "@/lib/db/schema";
-import { readingTime } from "@/lib/reading-time";
+import type { PostListItem } from "@/lib/db/queries";
 import { TagBadge } from "@/components/blog/tag-badge";
+import { toDate } from "@/lib/format-date";
 
 function dateParts(date: Date | string) {
-  const d = typeof date === "string" ? new Date(date) : date;
+  const d = toDate(date);
   const day = String(d.getDate()).padStart(2, "0");
   const my = `${String(d.getMonth() + 1).padStart(2, "0")} / ${d.getFullYear()}`;
   return { day, my };
 }
 
-export function PostCard({ post }: { post: Post }) {
+/**
+ * 列表卡片。只接收列表投影（PostListItem），不带正文全文——
+ * 字数/阅读时长由 SQL 侧算好，避免列表页搬运整篇 content_md。
+ */
+export function PostCard({ post }: { post: PostListItem }) {
   const { day, my } = dateParts(post.createdAt);
-  const { chars, minutes } = readingTime(post.contentMd);
+  const { charCount, readingMinutes } = post;
 
   return (
     <Link
@@ -45,9 +49,9 @@ export function PostCard({ post }: { post: Post }) {
           </p>
         )}
         <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10.5px] tracking-[0.12em] text-muted-foreground uppercase">
-          <span>{minutes} MIN READ</span>
+          <span>{readingMinutes} MIN READ</span>
           <span aria-hidden className="size-[3px] rounded-full bg-border" />
-          <span>{chars.toLocaleString()} 字</span>
+          <span>{charCount.toLocaleString()} 字</span>
           <span aria-hidden className="size-[3px] rounded-full bg-border" />
           <span>{post.views} 阅读</span>
         </p>

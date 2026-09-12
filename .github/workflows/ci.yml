@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 同一个分支连续推送时，取消上一次未跑完的任务
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format check
+        run: pnpm run format:check
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Type check
+        run: pnpm run typecheck
+
+      # 构建期不访问数据库（前台页面均为 force-dynamic，admin 页面需要会话），
+      # 所以这里用占位值即可验证「能不能构建通过」。
+      # 这些不是真实密钥，也不要在此处加入任何真实凭证。
+      - name: Build
+        run: pnpm run build
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+          DATABASE_URL_POOLER: postgresql://ci:ci@127.0.0.1:6543/ci
+          AUTH_SECRET: ci-placeholder-secret-not-used-at-build-time
+          AUTH_GITHUB_ID: ci-placeholder
+          AUTH_GITHUB_SECRET: ci-placeholder
+          ADMIN_EMAILS: ci@example.com
+          SITE_URL: https://example.com

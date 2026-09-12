@@ -1,0 +1,21 @@
+# 统一行尾为 LF。
+#
+# 背景：本机 git 设了 core.autocrlf=true，会把检出的文本文件转成 CRLF，
+# 而仓库索引里存的是 LF —— 导致 prettier（endOfLine 默认 "lf"）认为
+# 16 个源文件"格式不符"，ci 的 format:check 会因此失败。
+# 这里显式声明 eol=lf，保证工作区、索引、CI 三处行尾一致。
+* text=auto eol=lf
+
+# Windows 批处理必须保留 CRLF，否则脚本无法执行
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 二进制文件不做行尾转换
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.woff binary
+*.woff2 binary

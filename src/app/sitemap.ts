@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { allPublishedPosts, allTags } from "@/lib/db/queries";
 import { absUrl } from "@/lib/site";
+import { toDate } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const postRoutes: MetadataRoute.Sitemap = posts.map((post) => ({
     url: absUrl(`/posts/${post.slug}`),
-    lastModified: post.updatedAt,
+    lastModified: toDate(post.updatedAt),
     changeFrequency: "weekly",
     priority: 0.7,
   }));

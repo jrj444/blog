@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FilePlus, ExternalLink, Rss, PenLine } from "lucide-react";
-import { getDashboardStats, listRecentPosts, listTagsWithCounts } from "@/lib/db/queries";
+import { getDashboardStats, listRecentPosts, listTagsWithCountsUncached } from "@/lib/db/queries";
 import { formatDate } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export default async function AdminDashboardPage() {
   const [stats, recent, tags] = await Promise.all([
     getDashboardStats(),
     listRecentPosts(5),
-    listTagsWithCounts(),
+    listTagsWithCountsUncached(),
   ]);
 
   const cards = [

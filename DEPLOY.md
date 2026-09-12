@@ -37,15 +37,15 @@ git push origin main
 
 打开 **项目 → Settings → Environment Variables**，添加以下生产环境变量（`Production` 和 `Preview`）：
 
-| 变量 | 值 | 说明 |
-|---|---|---|
-| `DATABASE_URL_POOLER` | `postgresql://...`（Supabase **连接池 6543**） | 运行时连接，必填 |
-| `AUTH_GITHUB_ID` | GitHub OAuth App Client ID | 必填 |
-| `AUTH_GITHUB_SECRET` | GitHub OAuth App Client Secret | 必填 |
-| `AUTH_SECRET` | 新生成的强密钥 `openssl rand -base64 32` | 必填，生产请换新的 |
-| `AUTH_URL` | `https://jiangruijian.com` | Auth.js 回调/站点地址 |
-| `SITE_URL` | `https://jiangruijian.com` | sitemap/robots/RSS/metadata 用 |
-| `ADMIN_EMAILS` | 你的 GitHub 邮箱（逗号分隔） | 唯一可登录后台 |
+| 变量                  | 值                                             | 说明                           |
+| --------------------- | ---------------------------------------------- | ------------------------------ |
+| `DATABASE_URL_POOLER` | `postgresql://...`（Supabase **连接池 6543**） | 运行时连接，必填               |
+| `AUTH_GITHUB_ID`      | GitHub OAuth App Client ID                     | 必填                           |
+| `AUTH_GITHUB_SECRET`  | GitHub OAuth App Client Secret                 | 必填                           |
+| `AUTH_SECRET`         | 新生成的强密钥 `openssl rand -base64 32`       | 必填，生产请换新的             |
+| `AUTH_URL`            | `https://jiangruijian.com`                     | Auth.js 回调/站点地址          |
+| `SITE_URL`            | `https://jiangruijian.com`                     | sitemap/robots/RSS/metadata 用 |
+| `ADMIN_EMAILS`        | 你的 GitHub 邮箱（逗号分隔）                   | 唯一可登录后台                 |
 
 > ⚠️ **千万不要**把 `HTTPS_PROXY` / `HTTP_PROXY` 加进 Vercel。
 > `src/instrumentation.ts` 读到它们会把所有对外 fetch（含 GitHub OAuth 换 token）改成走代理，
@@ -72,10 +72,10 @@ Vercel 会提示你去 DNS 加记录。照下一节做。
 
 进入 **Cloudflare Dash → jiangruijian.com → DNS → Records**，添加：
 
-| 类型 | 名称 | 内容 | 代理 |
-|---|---|---|---|
-| `A` | `@`（根域） | `76.76.21.21` | ✅ Proxied（橙云） |
-| `CNAME` | `www` | `cname.vercel-dns.com` | ✅ Proxied（橙云） |
+| 类型    | 名称        | 内容                   | 代理               |
+| ------- | ----------- | ---------------------- | ------------------ |
+| `A`     | `@`（根域） | `76.76.21.21`          | ✅ Proxied（橙云） |
+| `CNAME` | `www`       | `cname.vercel-dns.com` | ✅ Proxied（橙云） |
 
 然后回到 Vercel 的 Domains 页面，等它显示 **Valid Configuration**（生效通常几分钟）。
 

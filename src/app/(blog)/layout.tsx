@@ -108,7 +108,12 @@ export default async function BlogLayout({ children }: { children: React.ReactNo
                 Life cannot be replayed, so why not be greedy
               </p>
               <div className="mt-6 flex gap-2">
-                <SocialIcon href="https://github.com/jrj444" label="GitHub" target="_blank" rel="noopener noreferrer">
+                <SocialIcon
+                  href="https://github.com/jrj444"
+                  label="GitHub"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   <svg
                     viewBox="0 0 24 24"
                     aria-hidden

@@ -72,9 +72,7 @@ export function MDXEditor({
                   <DiffSourceToggleWrapper
                     options={["rich-text", "source"]}
                     SourceToolbar={
-                      <span className="px-2 text-xs text-muted-foreground">
-                        Markdown 源码模式
-                      </span>
+                      <span className="px-2 text-xs text-muted-foreground">Markdown 源码模式</span>
                     }
                   >
                     <UndoRedo />

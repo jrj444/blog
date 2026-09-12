@@ -1,5 +1,6 @@
 import { allPublishedPosts } from "@/lib/db/queries";
 import { absUrl, siteConfig } from "@/lib/site";
+import { toUtcString } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export async function GET() {
   <title>${escapeXml(post.title)}</title>
   <link>${escapeXml(link)}</link>
   <guid>${escapeXml(link)}</guid>
-  <pubDate>${post.createdAt.toUTCString()}</pubDate>
+  <pubDate>${toUtcString(post.createdAt)}</pubDate>
   <description>${escapeXml(post.excerpt ?? "")}</description>
   <content:encoded>${escapeXml(post.contentMd)}</content:encoded>
 </item>`;

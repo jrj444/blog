@@ -46,7 +46,8 @@ function parseForm(formData: FormData): PostInput {
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean),
-    published: formData.get("published") === "on",
+    // 底部两个提交按钮分别带 intent=draft / intent=publish（回车隐式提交时取第一个按钮，即草稿）
+    published: formData.get("intent") === "publish",
   };
 }
 

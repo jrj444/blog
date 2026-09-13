@@ -101,6 +101,17 @@
     @apply bg-background text-foreground;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+  /* Tailwind v4 把按钮默认光标改成了 default，这里恢复「可点击 = 手型」的直觉 */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  label[for],
+  summary {
+    cursor: pointer;
+  }
+  button:disabled,
+  [aria-disabled="true"] {
+    cursor: not-allowed;
+  }
 }
 
 /* ===== 装饰层:顶部渐变 wash + 胶片噪点 grain ===== */

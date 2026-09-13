@@ -29,7 +29,7 @@
 | 认证   | **Auth.js(NextAuth v5) + GitHub OAuth + ADMIN_EMAILS 白名单** | 会话走 cookie；已实现。原 spec 的 Supabase Auth 未采用 |
 | 编辑   | @mdxeditor/editor                                | 后台 Markdown 编辑器（已接入 toolbar + placeholder）|
 | 渲染   | react-markdown + remark-gfm + rehype-pretty-code | 正文渲染 + 代码高亮（shiki）                        |
-| 存储   | **暂未接 Supabase Storage**                      | 封面图目前以「URL 字段」入库，可留空；上传未做     |
+| 存储   | **Cloudflare R2（已接）**                      | 封面图可手填 URL，也可在后台选图上传：浏览器端压缩转 WebP（长边 1600）→ 服务端签发预签名 PUT → 直传 R2 → 公开 URL 存库     |
 | 实时   | **未接入 Supabase Realtime**                     | 评论未做；后续走 Giscus（第三方）                   |
 | AI     | **延后**                                         | 未引入 AI 依赖、无 `api/ai/*`；embedding 模型未定   |
 
@@ -194,7 +194,7 @@ ADMIN_EMAILS=
 | S2   | 装 Supabase + Drizzle 依赖，写客户端 + 环境变量        | ✅ 已完成（Drizzle + postgres 运行时走 pooler；`.env.example` 已按实更新）                                          |
 | S3   | 创建 Supabase 项目，填真实密钥，Drizzle 建表 + rls.sql | ✅ 已完成（`drizzle/0000_condemned_gorgon.sql` + `supabase/rls.sql`；表为 `posts + settings`，无 embedding/注释表） |
 | S4   | Auth（GitHub OAuth）+ proxy.ts + admin                 | ✅ 已完成（Auth.js v5 + `ADMIN_EMAILS` 白名单 + `src/proxy.ts` + instrumentation 代理 + 重试）                       |
-| S5   | 文章 CRUD + 后台编辑器                                 | ✅ 已完成（CRUD + zod + slug 唯一化 + @mdxeditor 动态加载；后台表格列表 + 删除二次确认；封面图已以 URL 字段接入表单） |
+| S5   | 文章 CRUD + 后台编辑器                                 | ✅ 已完成（CRUD + zod + slug 唯一化 + @mdxeditor 动态加载；后台表格列表 + 删除二次确认；封面图支持 URL 或上传（R2 直传，2026-09-13）） |
 | S6   | 前台列表/详情 + Markdown 渲染                          | ✅ 已完成（列表/详情 + react-markdown + remark-gfm + rehype-pretty-code 代码高亮）                                   |
 | S7   | 标签/搜索/分页/阅读量/评论                             | ⚠️ 大部分完成（标签聚合/关键词搜索/分页/阅读量已做；**评论未做，Giscus 尚未接入**）                                  |
 | S8   | SEO / RSS / 关于页                                     | ✅ 已完成（页面级 metadata + sitemap / robots / `/feed.xml` + 关于页，其中关于页为 2026-09-13 补齐）                                            |
@@ -210,7 +210,7 @@ ADMIN_EMAILS=
 - **数据库表**：实际为 `posts` + `settings`（无 `profiles`/`comments`）。`settings` 表已定义但**代码未使用**（管理员身份走环境变量）。
 - **RLS**：改为"**已发布文章公开可读** + 服务端表 owner 绕过 RLS"；仅 `posts`/`settings` 开启 RLS，未建写策略；写权限由 NextAuth + Server Action 保证。
 - **代理**：`src/instrumentation.ts` 设置全局 undici 代理（读 `HTTPS_PROXY`/`HTTP_PROXY`），`src/auth.ts` 加 `customFetch` 重试。
-- **封面图**：已以「URL 字段」接入后台表单（可留空，非空须有效 URL）；**Supabase Storage 上传仍未接**。（修正：原 S5 备注「封面图字段未接入表单」已过时）
+- **封面图**：表单支持「手填 URL」与「本地上传」两种方式；上传走 **Cloudflare R2**（`cdn.jiangruijian.com`）：浏览器端压缩转 WebP → 服务端 `isAdmin()` 校验后签发预签名 PUT → 直传 R2（`Cache-Control: public, max-age=31536000, immutable`）。前台列表缩略图、文章头图、OG 图均已接入。（2026-09-13 更新）
 - **后台仪表盘**：已实做（已发布 / 草稿 / 今年 / 总阅读量 KPI + 最近更新 + 标签分布 + 快捷入口）；仍缺阅读量趋势图。
 - **依赖清理**：`@supabase/supabase-js` 已安装但**未被代码引用**（未建 `lib/supabase/*`），可后续清理。
 - **种子数据**：暂无 seed 脚本（`package.json` 无 `db:seed`，仓库内无 `scripts/`），需手工建档或后续补充。
@@ -227,7 +227,7 @@ ADMIN_EMAILS=
 
 1. **评论**：接入 Giscus（配置 repo/theme 等），并在文章详情页挂载组件。
 2. **AI（延后）**：若启动，需先建 `embedding` 向量列与 `article_chunks`，定 embedding 模型与维度，再加 `api/ai/*`。
-3. **可选**：仪表盘阅读量趋势图、Supabase Storage 封面上传、清理未使用的 `@supabase/supabase-js`、写 seed 脚本；阅读量 RPC 已收紧执行权（`revoke execute` from public/anon/authenticated，仅保留 owner 与 service_role）；统一 `SITE_URL` / `AUTH_URL` 与 GitHub OAuth 回调到 www（当前指向 apex，每次 admin 跳转多一次 308，2026-09-13 决定暂缓）。
+3. **可选**：仪表盘阅读量趋势图、清理未使用的 `@supabase/supabase-js`、写 seed 脚本；阅读量 RPC 已收紧执行权（`revoke execute` from public/anon/authenticated，仅保留 owner 与 service_role）；统一 `SITE_URL` / `AUTH_URL` 与 GitHub OAuth 回调到 www（当前指向 apex，每次 admin 跳转多一次 308，2026-09-13 决定暂缓）。
 
 **2026-09-13 已完成**：Vercel + 自定义域名上线验证；数据库连接池抗抖动（keep_alive / 连接池单例 / 只读查询重试）；登录后回跳原页面 + 开放重定向修复；关于页补齐；阅读量 RPC 执行权限收紧。
 
@@ -240,4 +240,4 @@ ADMIN_EMAILS=
 2. **AI 优先级**：摘要 / 标签推荐 / RAG 问答，先做哪个？embedding 用通义还是 OpenAI？pgvector 维度何时定稿（定好勿改）。
 3. **多语言**：博客是纯中文，还是要中英文切换（i18n）？
 4. **后台仪表盘**：基础统计已做（KPI / 最近更新 / 标签分布）；是否再加阅读量趋势图，用 `recharts` 还是 `@tremor/react`？
-5. **封面图**：先维持 URL 字段，还是尽快接 Supabase Storage 上传（含图片压缩/水印）？
+5. **封面图**：已接 R2 直传 + 客户端压缩；是否需要水印、多图、边缘裁剪（Cloudflare Images 付费项）再议。

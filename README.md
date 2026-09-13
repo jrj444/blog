@@ -30,16 +30,17 @@
 
 ## 技术栈
 
-| 层     | 选型                                                                      |
-| ------ | ------------------------------------------------------------------------- |
-| 框架   | Next.js 16（App Router / Server Components / Server Actions）+ TypeScript |
-| UI     | Tailwind CSS 4 + shadcn/ui 风格组件 + lucide-react + next-themes          |
-| 数据库 | Supabase Postgres（运行时走连接池 6543，迁移走直连 5432）+ pg_trgm        |
-| ORM    | Drizzle ORM + postgres.js                                                 |
-| 认证   | Auth.js（NextAuth v5）· GitHub OAuth + `ADMIN_EMAILS` 白名单              |
-| 渲染   | react-markdown + remark-gfm + rehype-pretty-code（Shiki）                 |
-| 编辑   | @mdxeditor/editor                                                         |
-| 部署   | Vercel（托管）+ Cloudflare（DNS / CDN）                                   |
+| 层     | 选型                                                                                                    |
+| ------ | ------------------------------------------------------------------------------------------------------- |
+| 框架   | Next.js 16（App Router / Server Components / Server Actions）+ TypeScript                               |
+| UI     | Tailwind CSS 4 + shadcn/ui（Button / Input / Textarea / Label / Checkbox） + lucide-react + next-themes |
+| 数据库 | Supabase Postgres（运行时走连接池 6543，迁移走直连 5432）+ pg_trgm                                      |
+| 图片   | Cloudflare R2（`cdn.jiangruijian.com`，预签名直传 + 边缘缓存一年）                                      |
+| ORM    | Drizzle ORM + postgres.js                                                                               |
+| 认证   | Auth.js（NextAuth v5）· GitHub OAuth + `ADMIN_EMAILS` 白名单                                            |
+| 渲染   | react-markdown + remark-gfm + rehype-pretty-code（Shiki）                                               |
+| 编辑   | @mdxeditor/editor                                                                                       |
+| 部署   | Vercel（托管）+ Cloudflare（DNS / CDN）                                                                 |
 
 ## 快速开始
 
@@ -114,5 +115,5 @@ supabase/rls.sql         # 索引 / RLS / 阅读量 RPC（手工执行）
 - **评论**：尚未接入（计划 Giscus）
 - **AI / RAG**：尚未开始（需先定 embedding 模型与维度，再建 `article_chunks` + pgvector）
 - **阅读量防刷**：已在数据库侧收紧——`increment_post_views` 仅保留表 owner 与 `service_role` 可执行（`anon` / `authenticated` 已 revoke，见 `supabase/rls.sql`）
-- **封面图**：目前只能填 URL，Supabase Storage 上传未做
+- **封面图**：已接 Cloudflare R2 —— 后台选图 → 浏览器压缩转 WebP（长边 1600）→ 预签名直传 R2 → 前台列表/详情/OG 展示；也可继续手填外链 URL
 - **本地连接抖动**：经代理链路时空闲数据库连接可能被静默丢弃；已用 `keep_alive` + 连接池单例 + 只读查询重试缓解，彻底解决可在代理里给 `*.supabase.com` 加直连规则

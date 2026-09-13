@@ -21,7 +21,7 @@ export function PostCard({ post }: { post: PostListItem }) {
   return (
     <Link
       href={`/posts/${post.slug}`}
-      className="group grid grid-cols-[auto_1fr] items-start gap-x-5 gap-y-2 py-6 sm:grid-cols-[auto_1fr_auto] sm:py-7"
+      className="group grid grid-cols-[auto_1fr] items-start gap-x-5 gap-y-2 py-6 sm:grid-cols-[auto_1fr_auto_auto] sm:py-7"
     >
       {/* 日期块 */}
       <div className="flex items-baseline gap-2 pt-0.5 font-mono text-muted-foreground sm:w-20 sm:flex-col sm:items-start sm:gap-0">
@@ -56,6 +56,20 @@ export function PostCard({ post }: { post: PostListItem }) {
           <span>{post.views} 阅读</span>
         </p>
       </div>
+
+      {/* 封面缩略图：桌面端显示，保持列表紧凑；移动端只在文章页看封面 */}
+      {post.coverImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={post.coverImage}
+          alt=""
+          width={320}
+          height={180}
+          loading="lazy"
+          decoding="async"
+          className="hidden aspect-video w-40 self-center rounded-md border border-border object-cover sm:block"
+        />
+      ) : null}
 
       {/* 箭头 */}
       <span

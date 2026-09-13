@@ -30,6 +30,19 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: post.title,
     description: post.excerpt ?? undefined,
+    openGraph: {
+      type: "article",
+      title: post.title,
+      description: post.excerpt ?? undefined,
+      publishedTime: toIsoString(post.createdAt),
+      images: post.coverImage ? [{ url: post.coverImage }] : undefined,
+    },
+    twitter: {
+      card: post.coverImage ? "summary_large_image" : "summary",
+      title: post.title,
+      description: post.excerpt ?? undefined,
+      images: post.coverImage ? [post.coverImage] : undefined,
+    },
   };
 }
 
@@ -72,6 +85,18 @@ export default async function PostPage({ params }: Props) {
           )}
         </div>
       </header>
+
+      {post.coverImage ? (
+        // 文章头图：走 Cloudflare 边缘缓存（上传时已带 immutable），这里不再走 Vercel 图片优化
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={post.coverImage}
+          alt=""
+          width={1200}
+          height={675}
+          className="mt-8 aspect-[16/9] w-full rounded-lg border border-border object-cover"
+        />
+      ) : null}
 
       <hr className="mt-8 border-border" />
 

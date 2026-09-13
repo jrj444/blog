@@ -43,6 +43,13 @@ begin
 end;
 $$;
 
+-- 权限收紧：Postgres 默认把函数 EXECUTE 授予 PUBLIC（anon / authenticated 会继承），
+-- 意味着只要拿到 anon key，就能直接调这个 RPC 刷阅读量。这里收回公开执行权，
+-- 只留给服务端可信角色：表 owner postgres（应用运行时连接）+ service_role（备用）。
+-- 自查：select has_function_privilege('anon', 'public.increment_post_views(uuid)', 'execute'); -- 应为 false
+revoke execute on function public.increment_post_views(uuid) from public, anon, authenticated;
+grant execute on function public.increment_post_views(uuid) to service_role;
+
 -- ------------------------------------------------------------
 -- RLS
 -- 说明：表 owner（postgres，Drizzle 直连用户）会绕过 RLS，所以读写都走服务端。

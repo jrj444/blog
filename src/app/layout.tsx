@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { siteConfig } from "@/lib/site";
@@ -62,6 +64,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           {children}
         </ThemeProvider>
+        {/* Vercel 监控：Web Analytics（访问量）+ Speed Insights（真实用户性能）
+            两者都只在生产环境上报，本地 dev 只加载调试脚本 */}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

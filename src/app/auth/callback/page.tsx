@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { isAdmin } from "@/auth";
+import { safeRedirectPath } from "@/lib/safe-redirect";
 
-type CallbackSearch = { next?: string };
+type CallbackSearch = { next?: string | string[] };
 
 export default async function CallbackPage({
   searchParams,
@@ -10,9 +11,10 @@ export default async function CallbackPage({
   searchParams: Promise<CallbackSearch>;
 }) {
   const { next } = await searchParams;
+  const target = safeRedirectPath(Array.isArray(next) ? next[0] : next);
 
   if (await isAdmin()) {
-    redirect(next && next.startsWith("/") ? next : "/admin");
+    redirect(target);
   }
 
   return (

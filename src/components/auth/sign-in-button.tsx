@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 
 // 直接表单 POST（与 Auth.js 内置登录页一致），规避 next-auth v5 beta 在
 // Next.js 16 上 signIn server action 报 Configuration 的 bug。
-export function SignInButton() {
+export function SignInButton({ callbackUrl = "/admin" }: { callbackUrl?: string }) {
   const [csrfToken, setCsrfToken] = useState("");
   const [loading, setLoading] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -38,7 +38,11 @@ export function SignInButton() {
         style={{ display: "none" }}
       >
         <input type="hidden" name="csrfToken" value={csrfToken} />
-        <input type="hidden" name="callbackUrl" value="/auth/callback?next=/admin" />
+        <input
+          type="hidden"
+          name="callbackUrl"
+          value={`/auth/callback?next=${encodeURIComponent(callbackUrl)}`}
+        />
       </form>
     </>
   );

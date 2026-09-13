@@ -9,7 +9,9 @@ export const proxy = auth((req) => {
   if (!isLoggedIn && req.nextUrl.pathname.startsWith("/admin")) {
     const url = req.nextUrl.clone();
     url.pathname = "/auth/signin";
-    url.searchParams.set("redirectTo", req.nextUrl.pathname);
+    // 带上原始路径 + 查询串，登录后能回到被打断的地方（登录页会做站内校验）
+    url.search = "";
+    url.searchParams.set("redirectTo", `${req.nextUrl.pathname}${req.nextUrl.search}`);
     return NextResponse.redirect(url);
   }
 

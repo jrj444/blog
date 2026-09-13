@@ -1,5 +1,5 @@
 import { unstable_cache } from "next/cache";
-import { db } from "@/lib/db";
+import { db, queryWithRetry } from "@/lib/db";
 import { posts } from "@/lib/db/schema";
 import { count, eq, and, or, ilike, arrayContains, desc, sql, type SQL } from "drizzle-orm";
 import { slugify, type PostInput } from "@/lib/validators/post";
@@ -81,68 +81,77 @@ function cached<TArgs extends unknown[], TResult>(
   name: string,
   fn: (...args: TArgs) => Promise<TResult>,
 ) {
-  return unstable_cache(fn, [POSTS_CACHE_TAG, name], {
-    tags: [POSTS_CACHE_TAG],
-    revalidate: 60,
-  });
+  // 再套一层连接级重试：偶发断连不该让前台页面直接 500
+  return unstable_cache(
+    (...args: TArgs) => queryWithRetry(() => fn(...args)),
+    [POSTS_CACHE_TAG, name],
+    {
+      tags: [POSTS_CACHE_TAG],
+      revalidate: 60,
+    },
+  );
 }
 
 // ---------- 后台查询（不缓存） ----------
 
 // 后台列表：全部（含草稿），分页
 export async function listPosts(page = 1, pageSize = 10) {
-  const offset = (page - 1) * pageSize;
+  return queryWithRetry(async () => {
+    const offset = (page - 1) * pageSize;
 
-  const rows = await db
-    .select()
-    .from(posts)
-    .orderBy(desc(posts.createdAt))
-    .limit(pageSize)
-    .offset(offset);
+    const rows = await db
+      .select()
+      .from(posts)
+      .orderBy(desc(posts.createdAt))
+      .limit(pageSize)
+      .offset(offset);
 
-  const [{ value: total }] = await db.select({ value: count() }).from(posts);
+    const [{ value: total }] = await db.select({ value: count() }).from(posts);
 
-  return {
-    posts: rows,
-    total,
-    page,
-    pageSize,
-    hasMore: offset + rows.length < total,
-  };
+    return {
+      posts: rows,
+      total,
+      page,
+      pageSize,
+      hasMore: offset + rows.length < total,
+    };
+  });
 }
 
 // 后台编辑页：按 id 取（含草稿）
 export function getPostById(id: string) {
-  return db.query.posts.findFirst({ where: eq(posts.id, id) });
+  return queryWithRetry(() => db.query.posts.findFirst({ where: eq(posts.id, id) }));
 }
 
 // 后台仪表盘：最近更新的文章（含草稿），按更新时间倒序
 export function listRecentPosts(limit = 5) {
-  return db.select().from(posts).orderBy(desc(posts.updatedAt)).limit(limit);
+  return queryWithRetry(() => db.select().from(posts).orderBy(desc(posts.updatedAt)).limit(limit));
 }
 
 // 后台仪表盘统计：已发表 / 草稿 / 今年发布 / 总阅读量。
 // 合并为单次查询——一趟往返拿全部计数，避免多次串行 round trip。
 export async function getDashboardStats() {
-  const rows = await db.execute(sql`
-    select
-      count(*) filter (where ${posts.published})::int as published,
-      count(*) filter (where not ${posts.published})::int as drafts,
-      count(*) filter (
-        where ${posts.published}
-          and extract(year from ${posts.createdAt}) = extract(year from now())
-      )::int as this_year,
-      coalesce(sum(${posts.views}), 0)::int as views
-    from ${posts}
-  `);
+  return queryWithRetry(async () => {
+    const rows = await db.execute(sql`
+      select
+        count(*) filter (where ${posts.published})::int as published,
+        count(*) filter (where not ${posts.published})::int as drafts,
+        count(*) filter (
+          where ${posts.published}
+            and extract(year from ${posts.createdAt}) = extract(year from now())
+        )::int as this_year,
+        coalesce(sum(${posts.views}), 0)::int as views
+      from ${posts}
+    `);
 
-  const row = firstRow(rows as ReadonlyArray<Record<string, number>>);
-  return {
-    published: row?.published ?? 0,
-    drafts: row?.drafts ?? 0,
-    thisYear: row?.this_year ?? 0,
-    views: row?.views ?? 0,
-  };
+    const row = firstRow(rows as ReadonlyArray<Record<string, number>>);
+    return {
+      published: row?.published ?? 0,
+      drafts: row?.drafts ?? 0,
+      thisYear: row?.this_year ?? 0,
+      views: row?.views ?? 0,
+    };
+  });
 }
 
 // ---------- 写操作（不缓存） ----------

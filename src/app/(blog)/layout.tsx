@@ -8,6 +8,7 @@ const SITE_LINKS = [
   { href: "/", label: "Home" },
   { href: "/posts", label: "Archive" },
   { href: "/tags", label: "Tags" },
+  { href: "/about", label: "About" },
 ];
 
 function SocialIcon({

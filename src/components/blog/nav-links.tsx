@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/", label: "Home" },
   { href: "/posts", label: "Archive" },
   { href: "/tags", label: "Tags" },
+  { href: "/about", label: "About" },
 ] as const;
 
 export function NavLinks({ showAdmin = false }: { showAdmin?: boolean }) {

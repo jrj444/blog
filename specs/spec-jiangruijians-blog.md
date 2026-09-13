@@ -2,7 +2,9 @@
 
 > 定位：个人技术博客 + AI 知识问答（RAG）。本项目由作者亲自搭建，本 spec 作为实现蓝图与讨论依据。
 
-> **进度核对时间：2026-09-01**。本章节基于对 `src/`、`drizzle/`、`supabase/rls.sql`、`.env.example`、`package.json` 的实际代码核对，更新了路线图与「实现偏差说明」，并修正了正文中与实现不一致的旧描述（如封面图已接入、认证已改用 Auth.js、数据库表为 `posts + settings` 等）。
+> **进度核对时间：2026-09-13**（前一次核对：2026-09-01）。本章节基于对 `src/`、`drizzle/`、`supabase/rls.sql`、`.env.example`、`package.json` 的实际代码核对，更新了路线图与「实现偏差说明」，并修正了正文中与实现不一致的旧描述（如封面图已接入、认证已改用 Auth.js、数据库表为 `posts + settings` 等）。
+
+> **2026-09-13 增补**：① 站点已上线（线上入口 `https://www.jiangruijian.com`，apex `jiangruijian.com` 308 → www）；② 后台仪表盘已从骨架变为实做；③ 更正「关于页已完成」的旧记录（实际未实现，见 S8 与「剩余待做」）；④ 修复两处线上体验问题——数据库连接池抗抖动（`keep_alive` / 连接池单例 / 只读查询重试）与登录后回跳原页面（含开放重定向修复）。
 
 ## 1. 项目概述
 
@@ -57,11 +59,11 @@ jiangruijians-blog/
 │   │   │   ├── posts/[slug]/page.tsx     # 文章详情（Markdown 渲染）
 │   │   │   ├── posts/[slug]/actions.ts   # 阅读量视图 RPC 触发
 │   │   │   ├── tags/[tag]/page.tsx       # 标签聚合 + 分页
-│   │   │   ├── about/page.tsx
+│   │   │   ├── about/page.tsx              # ⚠️ 未实现（规划中）
 │   │   │   ├── error.tsx / not-found.tsx
 │   │   ├── admin/                        # 后台（字面量路径 /admin）
 │   │   │   ├── layout.tsx                # 后台布局 + 登录校验
-│   │   │   ├── page.tsx                  # 仪表盘（骨架）
+│   │   │   ├── page.tsx                  # 仪表盘（KPI / 最近更新 / 标签分布）
 │   │   │   ├── posts/page.tsx            # 文章管理表格 + 删除
 │   │   │   ├── posts/new/page.tsx        # 新建
 │   │   │   ├── posts/[id]/page.tsx       # 编辑
@@ -142,9 +144,9 @@ jiangruijians-blog/
 | P1-2 | 前台列表/详情 + Markdown 渲染 + 代码高亮   | react-markdown    | ✅ |
 | P1-3 | 标签 + 搜索（pg_trgm）+ 分页               |                   | ✅ |
 | P1-4 | 评论 + 阅读量（RPC）                       | 评论改走 Giscus   | ⚠️ 阅读量✅ / 评论未做 |
-| P1-5 | 关于页 + sitemap + robots + RSS + SEO      |                   | ✅ |
+| P1-5 | 关于页 + sitemap + robots + RSS + SEO      |                   | ⚠️ SEO/RSS ✅ / 关于页 ❌ |
 | P2   | AI：摘要 / 标签推荐 / RAG 问答             | 定 embedding 模型 | ⏸ 延后 |
-| P3   | Vercel 部署 + 域名                         |                   | ⏳ 待做 |
+| P3   | Vercel 部署 + 域名                         | 已上线 www；apex 308 → www | ✅ |
 
 ## 9. AI / RAG 设计（暂缓）
 
@@ -195,9 +197,9 @@ ADMIN_EMAILS=
 | S5   | 文章 CRUD + 后台编辑器                                 | ✅ 已完成（CRUD + zod + slug 唯一化 + @mdxeditor 动态加载；后台表格列表 + 删除二次确认；封面图已以 URL 字段接入表单） |
 | S6   | 前台列表/详情 + Markdown 渲染                          | ✅ 已完成（列表/详情 + react-markdown + remark-gfm + rehype-pretty-code 代码高亮）                                   |
 | S7   | 标签/搜索/分页/阅读量/评论                             | ⚠️ 大部分完成（标签聚合/关键词搜索/分页/阅读量已做；**评论未做，Giscus 尚未接入**）                                  |
-| S8   | SEO / RSS / 关于页                                     | ✅ 已完成（关于页 + 页面级 metadata；sitemap / robots / `/feed.xml` RSS）                                            |
+| S8   | SEO / RSS / 关于页                                     | ⚠️ 页面级 metadata + sitemap / robots / `/feed.xml` ✅；**关于页未实现**（原记录有误）                                            |
 | S9   | AI 摘要/标签/RAG                                       | ⏸ 延后（无 AI 依赖、无 `api/ai/*`、无 embedding 列）                                                                |
-| S10  | Vercel 部署 + 域名                                     | ⏳ 待做（仓库内暂无 Vercel 配置，README 仍为 create-next-app 默认）                                                  |
+| S10  | Vercel 部署 + 域名                                     | ✅ 已完成（Vercel + Cloudflare 上线，线上 www.jiangruijian.com；README 已于 2026-09-13 重写）                                                  |
 
 ### 执行偏差说明（相对原始 spec，已核对）
 
@@ -209,24 +211,26 @@ ADMIN_EMAILS=
 - **RLS**：改为"**已发布文章公开可读** + 服务端表 owner 绕过 RLS"；仅 `posts`/`settings` 开启 RLS，未建写策略；写权限由 NextAuth + Server Action 保证。
 - **代理**：`src/instrumentation.ts` 设置全局 undici 代理（读 `HTTPS_PROXY`/`HTTP_PROXY`），`src/auth.ts` 加 `customFetch` 重试。
 - **封面图**：已以「URL 字段」接入后台表单（可留空，非空须有效 URL）；**Supabase Storage 上传仍未接**。（修正：原 S5 备注「封面图字段未接入表单」已过时）
-- **后台仪表盘**：`/admin` 页面仍为骨架（"后台骨架已就绪"），尚未做阅读量图表/统计。
+- **后台仪表盘**：已实做（已发布 / 草稿 / 今年 / 总阅读量 KPI + 最近更新 + 标签分布 + 快捷入口）；仍缺阅读量趋势图。
 - **依赖清理**：`@supabase/supabase-js` 已安装但**未被代码引用**（未建 `lib/supabase/*`），可后续清理。
 - **种子数据**：暂无 seed 脚本（`package.json` 无 `db:seed`，仓库内无 `scripts/`），需手工建档或后续补充。
 
-### 当前进度结论（2026-09-01）
+### 当前进度结论（2026-09-13）
 
 **已完成并验证**：
 
-- S1–S6、S8 全部完成；S7 除评论外已全部完成（标签/搜索/分页/阅读量）。
+- S1–S6 全部完成；S7 除评论外已全部完成（标签/搜索/分页/阅读量）；S8 除「关于页」外完成。
 - 前后台核心链路可跑：前台列表 → 详情（Markdown 渲染 + 代码高亮 + 阅读量）→ 标签/搜索/分页；后台登录（GitHub OAuth 白名单）→ 文章 CRUD → 编辑器发布。
-- SEO 三件套（sitemap / robots / RSS）+ 关于页 + 页面级 metadata 齐全。
+- SEO 三件套（sitemap / robots / RSS）+ 页面级 metadata 齐全；**关于页仍未实现**（原记录有误）。
 
 **剩余待做**：
 
 1. **评论**：接入 Giscus（配置 repo/theme 等），并在文章详情页挂载组件。
 2. **AI（延后）**：若启动，需先建 `embedding` 向量列与 `article_chunks`，定 embedding 模型与维度，再加 `api/ai/*`。
-3. **Vercel 部署 + 域名**：配置 `SITE_URL`、`AUTH_URL`、生产环境变量（含 GitHub OAuth 回调域名），绑定自定义域名，部署验证。
-4. **可选**：后台仪表盘统计、Supabase Storage 封面上传、清理未使用的 `@supabase/supabase-js`、写 seed 脚本。
+3. **关于页**：spec 中曾记为已完成，实际未实现（`src/app/(blog)/about/page.tsx` 不存在，导航也无入口）。
+4. **可选**：仪表盘阅读量趋势图、Supabase Storage 封面上传、清理未使用的 `@supabase/supabase-js`、写 seed 脚本；阅读量 RPC 可用 `revoke execute ... from anon, authenticated` 防刷；统一 `SITE_URL` / `AUTH_URL` 与 GitHub OAuth 回调到 www（当前指向 apex，每次 admin 跳转多一次 308，2026-09-13 决定暂缓）。
+
+**2026-09-13 已完成**：Vercel + 自定义域名上线验证；数据库连接池抗抖动（keep_alive / 连接池单例 / 只读查询重试）；登录后回跳原页面 + 开放重定向修复。
 
 ## 12. 待定 / 需讨论的点
 
@@ -236,5 +240,5 @@ ADMIN_EMAILS=
 1. **评论**：Giscus 的 repo 用哪个（建议独立仓库 `jiangruijian/blog-comments`）？是否要暗色模式适配？
 2. **AI 优先级**：摘要 / 标签推荐 / RAG 问答，先做哪个？embedding 用通义还是 OpenAI？pgvector 维度何时定稿（定好勿改）。
 3. **多语言**：博客是纯中文，还是要中英文切换（i18n）？
-4. **后台仪表盘**：是否需要阅读量图表、文章统计？若需要，用 `recharts` 还是 `@tremor/react`？
+4. **后台仪表盘**：基础统计已做（KPI / 最近更新 / 标签分布）；是否再加阅读量趋势图，用 `recharts` 还是 `@tremor/react`？
 5. **封面图**：先维持 URL 字段，还是尽快接 Supabase Storage 上传（含图片压缩/水印）？

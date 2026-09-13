@@ -4,7 +4,7 @@
 
 > **进度核对时间：2026-09-13**（前一次核对：2026-09-01）。本章节基于对 `src/`、`drizzle/`、`supabase/rls.sql`、`.env.example`、`package.json` 的实际代码核对，更新了路线图与「实现偏差说明」，并修正了正文中与实现不一致的旧描述（如封面图已接入、认证已改用 Auth.js、数据库表为 `posts + settings` 等）。
 
-> **2026-09-13 增补**：① 站点已上线（线上入口 `https://www.jiangruijian.com`，apex `jiangruijian.com` 308 → www）；② 后台仪表盘已从骨架变为实做；③ 更正「关于页已完成」的旧记录（实际未实现，见 S8 与「剩余待做」）；④ 修复两处线上体验问题——数据库连接池抗抖动（`keep_alive` / 连接池单例 / 只读查询重试）与登录后回跳原页面（含开放重定向修复）。
+> **2026-09-13 增补**：① 站点已上线（线上入口 `https://www.jiangruijian.com`，apex `jiangruijian.com` 308 → www）；② 后台仪表盘已从骨架变为实做；③ 更正「关于页已完成」的旧记录（实际未实现），并于当日补齐；④ 修复两处线上体验问题——数据库连接池抗抖动（`keep_alive` / 连接池单例 / 只读查询重试）与登录后回跳原页面（含开放重定向修复）。
 
 ## 1. 项目概述
 
@@ -59,7 +59,7 @@ jiangruijians-blog/
 │   │   │   ├── posts/[slug]/page.tsx     # 文章详情（Markdown 渲染）
 │   │   │   ├── posts/[slug]/actions.ts   # 阅读量视图 RPC 触发
 │   │   │   ├── tags/[tag]/page.tsx       # 标签聚合 + 分页
-│   │   │   ├── about/page.tsx              # ⚠️ 未实现（规划中）
+│   │   │   ├── about/page.tsx            # 关于页
 │   │   │   ├── error.tsx / not-found.tsx
 │   │   ├── admin/                        # 后台（字面量路径 /admin）
 │   │   │   ├── layout.tsx                # 后台布局 + 登录校验
@@ -144,7 +144,7 @@ jiangruijians-blog/
 | P1-2 | 前台列表/详情 + Markdown 渲染 + 代码高亮   | react-markdown    | ✅ |
 | P1-3 | 标签 + 搜索（pg_trgm）+ 分页               |                   | ✅ |
 | P1-4 | 评论 + 阅读量（RPC）                       | 评论改走 Giscus   | ⚠️ 阅读量✅ / 评论未做 |
-| P1-5 | 关于页 + sitemap + robots + RSS + SEO      |                   | ⚠️ SEO/RSS ✅ / 关于页 ❌ |
+| P1-5 | 关于页 + sitemap + robots + RSS + SEO      |                   | ✅（关于页 2026-09-13 补齐） |
 | P2   | AI：摘要 / 标签推荐 / RAG 问答             | 定 embedding 模型 | ⏸ 延后 |
 | P3   | Vercel 部署 + 域名                         | 已上线 www；apex 308 → www | ✅ |
 
@@ -197,7 +197,7 @@ ADMIN_EMAILS=
 | S5   | 文章 CRUD + 后台编辑器                                 | ✅ 已完成（CRUD + zod + slug 唯一化 + @mdxeditor 动态加载；后台表格列表 + 删除二次确认；封面图已以 URL 字段接入表单） |
 | S6   | 前台列表/详情 + Markdown 渲染                          | ✅ 已完成（列表/详情 + react-markdown + remark-gfm + rehype-pretty-code 代码高亮）                                   |
 | S7   | 标签/搜索/分页/阅读量/评论                             | ⚠️ 大部分完成（标签聚合/关键词搜索/分页/阅读量已做；**评论未做，Giscus 尚未接入**）                                  |
-| S8   | SEO / RSS / 关于页                                     | ⚠️ 页面级 metadata + sitemap / robots / `/feed.xml` ✅；**关于页未实现**（原记录有误）                                            |
+| S8   | SEO / RSS / 关于页                                     | ✅ 已完成（页面级 metadata + sitemap / robots / `/feed.xml` + 关于页，其中关于页为 2026-09-13 补齐）                                            |
 | S9   | AI 摘要/标签/RAG                                       | ⏸ 延后（无 AI 依赖、无 `api/ai/*`、无 embedding 列）                                                                |
 | S10  | Vercel 部署 + 域名                                     | ✅ 已完成（Vercel + Cloudflare 上线，线上 www.jiangruijian.com；README 已于 2026-09-13 重写）                                                  |
 
@@ -219,18 +219,17 @@ ADMIN_EMAILS=
 
 **已完成并验证**：
 
-- S1–S6 全部完成；S7 除评论外已全部完成（标签/搜索/分页/阅读量）；S8 除「关于页」外完成。
+- S1–S6、S8 全部完成；S7 除评论外已全部完成（标签/搜索/分页/阅读量）。
 - 前后台核心链路可跑：前台列表 → 详情（Markdown 渲染 + 代码高亮 + 阅读量）→ 标签/搜索/分页；后台登录（GitHub OAuth 白名单）→ 文章 CRUD → 编辑器发布。
-- SEO 三件套（sitemap / robots / RSS）+ 页面级 metadata 齐全；**关于页仍未实现**（原记录有误）。
+- SEO 三件套（sitemap / robots / RSS）+ 页面级 metadata + 关于页齐全。
 
 **剩余待做**：
 
 1. **评论**：接入 Giscus（配置 repo/theme 等），并在文章详情页挂载组件。
 2. **AI（延后）**：若启动，需先建 `embedding` 向量列与 `article_chunks`，定 embedding 模型与维度，再加 `api/ai/*`。
-3. **关于页**：spec 中曾记为已完成，实际未实现（`src/app/(blog)/about/page.tsx` 不存在，导航也无入口）。
-4. **可选**：仪表盘阅读量趋势图、Supabase Storage 封面上传、清理未使用的 `@supabase/supabase-js`、写 seed 脚本；阅读量 RPC 可用 `revoke execute ... from anon, authenticated` 防刷；统一 `SITE_URL` / `AUTH_URL` 与 GitHub OAuth 回调到 www（当前指向 apex，每次 admin 跳转多一次 308，2026-09-13 决定暂缓）。
+3. **可选**：仪表盘阅读量趋势图、Supabase Storage 封面上传、清理未使用的 `@supabase/supabase-js`、写 seed 脚本；阅读量 RPC 已收紧执行权（`revoke execute` from public/anon/authenticated，仅保留 owner 与 service_role）；统一 `SITE_URL` / `AUTH_URL` 与 GitHub OAuth 回调到 www（当前指向 apex，每次 admin 跳转多一次 308，2026-09-13 决定暂缓）。
 
-**2026-09-13 已完成**：Vercel + 自定义域名上线验证；数据库连接池抗抖动（keep_alive / 连接池单例 / 只读查询重试）；登录后回跳原页面 + 开放重定向修复。
+**2026-09-13 已完成**：Vercel + 自定义域名上线验证；数据库连接池抗抖动（keep_alive / 连接池单例 / 只读查询重试）；登录后回跳原页面 + 开放重定向修复；关于页补齐；阅读量 RPC 执行权限收紧。
 
 ## 12. 待定 / 需讨论的点
 

@@ -15,6 +15,7 @@
 - **归档** `/posts`：关键词搜索（标题 + 正文，pg_trgm）、分页，搜索词在翻页时保留
 - **文章详情** `/posts/[slug]`：Markdown 渲染（remark-gfm）+ Shiki 代码高亮（亮/暗双主题）、阅读时长、阅读量、标签
 - **标签** `/tags`、`/tags/[tag]`：标签云（含计数）+ 标签下文章分页
+- **关于** `/about`：一段话介绍（记录日常 coding 与分享）
 - **SEO**：`sitemap.xml`、`robots.txt`、`/feed.xml`（RSS 全文输出）、页面级 metadata、Open Graph
 - 暗色模式、移动端导航、滚动入场动画
 
@@ -112,7 +113,6 @@ supabase/rls.sql         # 索引 / RLS / 阅读量 RPC（手工执行）
 
 - **评论**：尚未接入（计划 Giscus）
 - **AI / RAG**：尚未开始（需先定 embedding 模型与维度，再建 `article_chunks` + pgvector）
-- **关于页**：spec 中曾记为已完成，实际未实现；导航暂无入口
-- **阅读量防刷**：`increment_post_views` 是 `security definer`，默认对 `anon` / `authenticated` 开放，可用 `revoke execute` 收紧
+- **阅读量防刷**：已在数据库侧收紧——`increment_post_views` 仅保留表 owner 与 `service_role` 可执行（`anon` / `authenticated` 已 revoke，见 `supabase/rls.sql`）
 - **封面图**：目前只能填 URL，Supabase Storage 上传未做
 - **本地连接抖动**：经代理链路时空闲数据库连接可能被静默丢弃；已用 `keep_alive` + 连接池单例 + 只读查询重试缓解，彻底解决可在代理里给 `*.supabase.com` 加直连规则

@@ -44,8 +44,9 @@ export function MDXEditor({
 
   return (
     <div>
-      <div className="overflow-hidden rounded-lg border border-border bg-white">
+      <div className="overflow-hidden rounded-lg border border-border bg-card">
         <BaseMDXEditor
+          className="mdx-editor-surface"
           markdown={markdown}
           onChange={(md) => onChange(md)}
           placeholder={placeholder}

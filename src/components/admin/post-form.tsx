@@ -217,10 +217,14 @@ export function PostForm({ action, defaultValues }: Props) {
           coverRef.current.value = coverUrl;
         }
       }}
-      className="space-y-8"
+      className="space-y-6 pb-16"
     >
       {/* 基本信息 */}
-      <section className="space-y-4">
+      <section className="space-y-4 rounded-xl border border-border bg-card p-5 shadow-sm">
+        <div className="border-b border-border pb-3">
+          <h2 className="text-sm font-semibold">基本信息</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">标题、摘要、Slug 与文章标签。</p>
+        </div>
         <div className="space-y-2">
           <Label htmlFor="post-title">标题</Label>
           <Input
@@ -272,9 +276,9 @@ export function PostForm({ action, defaultValues }: Props) {
       </section>
 
       {/* 封面图 */}
-      <section className="space-y-3">
+      <section className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-medium">封面图</h2>
+          <h2 className="text-sm font-semibold">封面图</h2>
           <Button
             type="button"
             variant="ghost"
@@ -379,8 +383,13 @@ export function PostForm({ action, defaultValues }: Props) {
       </section>
 
       {/* 正文 */}
-      <section className="space-y-2">
-        <h2 className="text-sm font-medium">正文</h2>
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold">正文</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            支持 Markdown、代码块、表格与图片。
+          </p>
+        </div>
         <PostEditor
           markdown={markdown}
           onMarkdownChange={setMarkdown}
@@ -395,7 +404,7 @@ export function PostForm({ action, defaultValues }: Props) {
       {state?.message && <p className="text-sm text-destructive">{state.message}</p>}
 
       {/* 底部操作条：吸底；用 name="intent" 区分「保存为草稿」与「发布」 */}
-      <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur">
+      <div className="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <p className="text-xs text-muted-foreground">
           {defaultValues?.published ? "当前状态：已发布" : "当前状态：草稿"}
         </p>

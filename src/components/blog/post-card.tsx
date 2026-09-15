@@ -40,7 +40,7 @@ export function PostCard({ post }: { post: PostListItem }) {
             ))}
           </div>
         )}
-        <h2 className="font-serif text-lg leading-snug font-semibold tracking-tight text-foreground transition-colors group-hover:text-accent-2">
+        <h2 className="font-serif text-lg leading-snug font-semibold tracking-tight text-foreground transition-colors group-hover:text-primary">
           {post.title}
         </h2>
         {post.excerpt && (

@@ -37,7 +37,7 @@ export default async function TagsPage() {
                 key={tag}
                 href={`/tags/${encodeURIComponent(tag)}`}
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full border border-border text-muted-foreground transition-colors hover:border-accent-2 hover:text-accent-2",
+                  "inline-flex items-center gap-1.5 rounded-full border border-border text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary",
                   big ? "px-5 py-2 text-base" : "px-3.5 py-1.5 text-sm",
                 )}
               >

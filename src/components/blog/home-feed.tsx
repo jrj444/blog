@@ -11,8 +11,8 @@ const chip = (active: boolean) =>
   cn(
     "rounded-full border px-3 py-1 text-xs transition-colors",
     active
-      ? "border-accent-2 bg-accent text-accent-foreground"
-      : "border-border text-muted-foreground hover:border-accent-2 hover:text-accent-2",
+      ? "border-primary/40 bg-accent text-accent-foreground"
+      : "border-border text-muted-foreground hover:border-primary/40 hover:text-primary",
   );
 
 export function HomeFeed({ posts, hasMore }: { posts: PostListItem[]; hasMore: boolean }) {

@@ -12,7 +12,7 @@ export function TagBadge({ tag, className, asSpan = false }: TagBadgeProps) {
   // 作为 span 渲染时去掉 hover 交互样式：它在 Link 内部，本身不可独立点击
   const classes = cn(
     "inline-flex items-center rounded-full border border-border bg-muted/40 px-2.5 py-0.5 text-xs leading-5 text-muted-foreground",
-    !asSpan && "transition-colors hover:border-foreground/25 hover:text-foreground",
+    !asSpan && "transition-colors hover:border-primary/40 hover:text-primary",
     className,
   );
 

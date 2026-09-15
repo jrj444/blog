@@ -33,7 +33,7 @@ export function NavLinks({ showAdmin = false }: { showAdmin?: boolean }) {
 
   const underline = (active: boolean) =>
     cn(
-      "absolute inset-x-0 -bottom-0.5 h-px origin-left bg-accent-2 transition-transform duration-200",
+      "absolute inset-x-0 -bottom-0.5 h-px origin-left bg-primary transition-transform duration-200",
       active ? "scale-x-100" : "scale-x-0",
     );
 

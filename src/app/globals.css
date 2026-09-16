@@ -99,6 +99,10 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
@@ -199,6 +203,7 @@
     line-height: 1.4;
     letter-spacing: -0.01em;
     color: hsl(var(--foreground));
+    scroll-margin-top: 5rem;
   }
   .markdown-body h1 {
     font-size: 1.6rem;
@@ -543,5 +548,11 @@
   .hello-caret {
     opacity: 1;
     animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
   }
 }

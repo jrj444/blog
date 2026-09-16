@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Eye } from "lucide-react";
 import type { Metadata } from "next";
 import { getPublishedPostBySlug } from "@/lib/db/queries";
-import { Markdown } from "@/components/blog/markdown";
+import { MarkdownWithToc } from "@/components/blog/markdown";
 import { TagBadge } from "@/components/blog/tag-badge";
 import { ViewTracker } from "@/components/blog/view-tracker";
 import { formatDate, toIsoString } from "@/lib/format-date";
@@ -55,54 +55,8 @@ export default async function PostPage({ params }: Props) {
   }
 
   return (
-    <article className="mx-auto max-w-3xl">
-      <Link
-        href="/posts"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-      >
-        <ArrowLeft aria-hidden className="size-4" />
-        返回文章列表
-      </Link>
-
-      <header className="mt-6">
-        <h1 className="font-serif text-3xl leading-snug font-bold tracking-tight sm:text-4xl sm:leading-tight">
-          {post.title}
-        </h1>
-        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
-          <time dateTime={toIsoString(post.createdAt)} className="tabular-nums">
-            {formatDate(post.createdAt)}
-          </time>
-          <span className="inline-flex items-center gap-1 tabular-nums">
-            <Eye aria-hidden className="size-3.5" />
-            {post.views} 次阅读
-          </span>
-          {post.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {post.tags.map((tag) => (
-                <TagBadge key={tag} tag={tag} />
-              ))}
-            </div>
-          )}
-        </div>
-      </header>
-
-      {post.coverImage ? (
-        // 文章头图：走 Cloudflare 边缘缓存（上传时已带 immutable），这里不再走 Vercel 图片优化
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={post.coverImage}
-          alt=""
-          width={1200}
-          height={675}
-          className="mt-8 aspect-[16/9] w-full rounded-lg border border-border object-cover"
-        />
-      ) : null}
-
-      <hr className="mt-8 border-border" />
-
-      <Markdown content={post.contentMd} className="mt-8" />
-
-      <footer className="mt-14 border-t pt-6">
+    <article className="mx-auto max-w-[68rem]">
+      <div className="mx-auto max-w-3xl xl:mx-0">
         <Link
           href="/posts"
           className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -110,7 +64,59 @@ export default async function PostPage({ params }: Props) {
           <ArrowLeft aria-hidden className="size-4" />
           返回文章列表
         </Link>
-      </footer>
+
+        <header className="mt-6">
+          <h1 className="font-serif text-3xl leading-snug font-bold tracking-tight sm:text-4xl sm:leading-tight">
+            {post.title}
+          </h1>
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
+            <time dateTime={toIsoString(post.createdAt)} className="tabular-nums">
+              {formatDate(post.createdAt)}
+            </time>
+            <span className="inline-flex items-center gap-1 tabular-nums">
+              <Eye aria-hidden className="size-3.5" />
+              {post.views} 次阅读
+            </span>
+            {post.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {post.tags.map((tag) => (
+                  <TagBadge key={tag} tag={tag} />
+                ))}
+              </div>
+            )}
+          </div>
+        </header>
+
+        {post.coverImage ? (
+          // 文章头图：走 Cloudflare 边缘缓存（上传时已带 immutable），这里不再走 Vercel 图片优化
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={post.coverImage}
+            alt=""
+            width={1200}
+            height={675}
+            className="mt-8 aspect-[16/9] w-full rounded-lg border border-border object-cover"
+          />
+        ) : null}
+
+        <hr className="mt-8 border-border" />
+      </div>
+
+      <MarkdownWithToc
+        content={post.contentMd}
+        className="mt-8"
+        footer={
+          <footer className="mt-14 border-t pt-6">
+            <Link
+              href="/posts"
+              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft aria-hidden className="size-4" />
+              返回文章列表
+            </Link>
+          </footer>
+        }
+      />
 
       <ViewTracker postId={post.id} />
     </article>

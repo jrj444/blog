@@ -3,6 +3,7 @@ import { ExternalLink, Eye, Feather, PenLine, Search } from "lucide-react";
 import { listPosts } from "@/lib/db/queries";
 import { DeletePostButton } from "@/components/admin/delete-post-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
@@ -63,13 +64,12 @@ export default async function AdminPostsPage({
         title="文章管理"
         description={`共 ${counts.all} 篇文章（已发布 ${counts.published}，草稿 ${counts.draft}）。`}
         actions={
-          <Link
-            href="/admin/posts/new"
-            className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
-          >
-            <PenLine aria-hidden className="size-4" />
-            新建文章
-          </Link>
+          <Button asChild>
+            <Link href="/admin/posts/new">
+              <PenLine aria-hidden className="size-4" />
+              新建文章
+            </Link>
+          </Button>
         }
       />
 
@@ -95,7 +95,7 @@ export default async function AdminPostsPage({
                   className={cn(
                     "rounded-full px-1.5 py-0.5 text-[10.5px] tabular-nums",
                     active
-                      ? "bg-muted font-semibold text-foreground"
+                      ? "bg-muted font-medium text-foreground"
                       : "bg-background/60 text-muted-foreground",
                   )}
                 >
@@ -234,7 +234,7 @@ export default async function AdminPostsPage({
                         >
                           编辑
                         </Link>
-                        <DeletePostButton id={post.id} />
+                        <DeletePostButton id={post.id} title={post.title} />
                       </div>
                     </td>
                   </tr>
@@ -249,23 +249,17 @@ export default async function AdminPostsPage({
       {pageCount > 1 ? (
         <div className="flex items-center justify-center gap-2 text-sm">
           {page > 1 ? (
-            <Link
-              href={buildHref({ page: page - 1 })}
-              className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted/50 hover:text-foreground"
-            >
-              上一页
-            </Link>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={buildHref({ page: page - 1 })}>上一页</Link>
+            </Button>
           ) : null}
           <span className="px-2 font-mono text-xs text-muted-foreground">
             {page} / {pageCount}
           </span>
           {hasMore ? (
-            <Link
-              href={buildHref({ page: page + 1 })}
-              className="inline-flex h-8 items-center rounded-md border border-border bg-card px-3 text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted/50 hover:text-foreground"
-            >
-              下一页
-            </Link>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={buildHref({ page: page + 1 })}>下一页</Link>
+            </Button>
           ) : null}
         </div>
       ) : null}

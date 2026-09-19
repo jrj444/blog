@@ -1,4 +1,9 @@
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 /** 允许的图片类型 → 扩展名。不含 SVG（可内联脚本，等于 XSS 风险） */
@@ -118,4 +123,55 @@ export async function createUploadTarget(options: {
 export async function deleteObject(key: string): Promise<void> {
   const { client, bucket } = config();
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+}
+
+export type MediaReference = {
+  id: string;
+  title: string;
+  slug: string;
+  isCover: boolean;
+};
+
+export type StoredMediaItem = {
+  key: string;
+  size: number;
+  lastModified: string;
+  publicUrl: string;
+};
+
+export type StoredMediaItemWithRefs = StoredMediaItem & {
+  references: MediaReference[];
+};
+
+/**
+ * 列取存储桶中的对象（媒体库使用）
+ * 按最后修改时间倒序排列
+ */
+export async function listObjects(prefix?: string): Promise<StoredMediaItem[]> {
+  try {
+    const { client, bucket, publicBaseUrl } = config();
+    const command = new ListObjectsV2Command({
+      Bucket: bucket,
+      Prefix: prefix || undefined,
+      MaxKeys: 500,
+    });
+    const response = await client.send(command);
+    if (!response.Contents) return [];
+
+    return response.Contents.filter(
+      (item): item is typeof item & { Key: string } => typeof item.Key === "string",
+    )
+      .map((item) => ({
+        key: item.Key,
+        size: item.Size ?? 0,
+        lastModified: item.LastModified
+          ? item.LastModified.toISOString()
+          : new Date().toISOString(),
+        publicUrl: `${publicBaseUrl}/${item.Key}`,
+      }))
+      .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
+  } catch (err) {
+    console.error("[storage] listObjects error:", err);
+    return [];
+  }
 }

@@ -23,8 +23,8 @@ const isProduction = process.env.NODE_ENV === "production";
 function createClient() {
   return postgres(poolerUrl!, {
     prepare: false,
-    // 本地开发放开到 3：一条坏连接不至于把「唯一一条」连接占死，导致整站排队
-    max: isProduction ? 10 : 3,
+    // 本地开发放开到 5：支持仪表盘并发查询与重试，避免连接竞争
+    max: isProduction ? 10 : 5,
     // Supabase 云实例要求 TLS
     ssl: "require",
     // 秒：建立连接的上限（默认 30s，卡住时会表现成「转圈约 30 秒」）
@@ -88,16 +88,29 @@ const RETRIABLE_DB_CODES = new Set([
   "57014",
 ]);
 
-function codeOf(error: unknown): string | undefined {
-  if (typeof error !== "object" || error === null) return undefined;
-  const e = error as { code?: unknown; cause?: { code?: unknown } };
-  const code = e.code ?? e.cause?.code;
-  return typeof code === "string" ? code : undefined;
-}
-
 export function isRetriableDbError(error: unknown): boolean {
-  const code = codeOf(error);
-  return code !== undefined && RETRIABLE_DB_CODES.has(code);
+  let curr: unknown = error;
+  while (typeof curr === "object" && curr !== null) {
+    const e = curr as { code?: unknown; message?: unknown; cause?: unknown };
+    if (typeof e.code === "string" && RETRIABLE_DB_CODES.has(e.code)) {
+      return true;
+    }
+    if (typeof e.message === "string") {
+      const msg = e.message.toLowerCase();
+      if (
+        msg.includes("connection closed") ||
+        msg.includes("connection destroyed") ||
+        msg.includes("econnreset") ||
+        msg.includes("etimedout") ||
+        msg.includes("econnrefused") ||
+        msg.includes("connect timeout")
+      ) {
+        return true;
+      }
+    }
+    curr = e.cause;
+  }
+  return false;
 }
 
 /**

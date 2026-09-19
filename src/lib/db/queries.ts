@@ -483,28 +483,32 @@ export const allPublishedPosts = cached("all-published", () =>
 );
 
 /** 已发布文章用到的全部标签（去重，无计数） */
-async function queryAllTags() {
-  const rows = await db.select({ tags: posts.tags }).from(posts).where(eq(posts.published, true));
-  const set = new Set<string>();
-  for (const row of rows) {
-    for (const tag of row.tags) set.add(tag);
-  }
-  return [...set];
+function queryAllTags() {
+  return queryWithRetry(async () => {
+    const rows = await db.select({ tags: posts.tags }).from(posts).where(eq(posts.published, true));
+    const set = new Set<string>();
+    for (const row of rows) {
+      for (const tag of row.tags) set.add(tag);
+    }
+    return [...set];
+  });
 }
 
 /** sitemap 用：全部标签 */
 export const allTags = cached("all-tags", queryAllTags);
 
 /** 标签云:从已发布文章聚合标签及数量 */
-async function queryTagsWithCounts() {
-  const rows = await db.select({ tags: posts.tags }).from(posts).where(eq(posts.published, true));
-  const counts = new Map<string, number>();
-  for (const row of rows) {
-    for (const tag of row.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-  }
-  return [...counts.entries()]
-    .map(([tag, count]) => ({ tag, count }))
-    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, "zh-CN"));
+function queryTagsWithCounts() {
+  return queryWithRetry(async () => {
+    const rows = await db.select({ tags: posts.tags }).from(posts).where(eq(posts.published, true));
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      for (const tag of row.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, "zh-CN"));
+  });
 }
 
 /** 前台标签页用（缓存） */
@@ -512,3 +516,86 @@ export const listTagsWithCounts = cached("tags-with-counts", queryTagsWithCounts
 
 /** 后台仪表盘用（不缓存，管理员需要看到刚发布的数据） */
 export const listTagsWithCountsUncached = queryTagsWithCounts;
+
+// ---------- 媒体库反向引用扫描 ----------
+
+export type MediaReference = {
+  id: string;
+  title: string;
+  slug: string;
+  isCover: boolean;
+};
+
+/** 从完整 URL 或相对路径中提取 R2 对象的规范 Key */
+export function extractR2Key(urlOrPath: string): string | null {
+  try {
+    const trimmed = urlOrPath.trim();
+    if (!trimmed) return null;
+    let path = trimmed;
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      const u = new URL(trimmed);
+      path = u.pathname;
+    }
+    const clean = path.replace(/^\/+/, "");
+    return clean || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 后台媒体库反查：轻量扫描所有文章（含草稿），
+ * 提取 coverImage 与 contentMd 中引用的图片 Key 并建立索引字典
+ */
+export async function listMediaReferences(): Promise<Record<string, MediaReference[]>> {
+  return queryWithRetry(async () => {
+    const rows = await db
+      .select({
+        id: posts.id,
+        title: posts.title,
+        slug: posts.slug,
+        coverImage: posts.coverImage,
+        contentMd: posts.contentMd,
+      })
+      .from(posts);
+
+    const refMap: Record<string, MediaReference[]> = {};
+
+    const addRef = (key: string, ref: MediaReference) => {
+      const cleanKey = key.replace(/^\/+/, "");
+      if (!cleanKey) return;
+      if (!refMap[cleanKey]) refMap[cleanKey] = [];
+      if (!refMap[cleanKey].some((r) => r.id === ref.id && r.isCover === ref.isCover)) {
+        refMap[cleanKey].push(ref);
+      }
+    };
+
+    for (const post of rows) {
+      // 1. 封面图引用
+      if (post.coverImage) {
+        const key = extractR2Key(post.coverImage);
+        if (key) {
+          addRef(key, { id: post.id, title: post.title, slug: post.slug, isCover: true });
+        }
+      }
+
+      // 2. 正文插图引用（匹配 Markdown ![alt](url) 与 HTML <img src="url"> 等）
+      if (post.contentMd) {
+        const matches = post.contentMd.matchAll(
+          /(?:!\[.*?\]\((https?:\/\/[^\s\)\"\'<>]+|\/[^\s\)\"\'<>]+\.[a-zA-Z0-9]+)\)|<img\s+[^>]*src=["']([^"']+)["'])/g,
+        );
+        for (const match of matches) {
+          const rawUrl = match[1] || match[2];
+          if (rawUrl) {
+            const key = extractR2Key(rawUrl);
+            if (key) {
+              addRef(key, { id: post.id, title: post.title, slug: post.slug, isCover: false });
+            }
+          }
+        }
+      }
+    }
+
+    return refMap;
+  });
+}

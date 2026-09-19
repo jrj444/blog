@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/queries";
 import { formatDate } from "@/lib/format-date";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
+import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -59,13 +60,12 @@ export default async function AdminDashboardPage() {
         title="仪表盘"
         description="查看站点内容状态、最近更新、热门阅读与标签分布。"
         actions={
-          <Link
-            href="/admin/posts/new"
-            className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-3.5 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
-          >
-            <FilePlus aria-hidden className="size-4" />
-            新建文章
-          </Link>
+          <Button asChild>
+            <Link href="/admin/posts/new">
+              <FilePlus aria-hidden className="size-4" />
+              新建文章
+            </Link>
+          </Button>
         }
       />
 
@@ -95,14 +95,12 @@ export default async function AdminDashboardPage() {
         </h2>
         <div className="flex flex-wrap gap-2">
           {quickLinks.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-[13px] font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted/50 hover:text-foreground"
-            >
-              <Icon aria-hidden className="size-4" />
-              {label}
-            </Link>
+            <Button key={href} variant="outline" asChild>
+              <Link href={href}>
+                <Icon aria-hidden className="size-4 text-muted-foreground" />
+                {label}
+              </Link>
+            </Button>
           ))}
         </div>
       </section>

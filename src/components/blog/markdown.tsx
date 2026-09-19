@@ -10,6 +10,8 @@ import type { TocItem } from "@/lib/markdown-toc";
 import { cn } from "@/lib/utils";
 import { TableOfContents } from "./table-of-contents";
 
+import { CodeBlock } from "./code-block";
+
 type MarkdownProps = {
   content: string;
   className?: string;
@@ -36,6 +38,23 @@ function collectHeadings(headings: TocItem[]) {
   };
 }
 
+/** 在 rehype-pretty-code 语法高亮前提取纯文本代码，挂载到 pre 上供复制代码使用 */
+function extractRawCode() {
+  return () => (tree: Root) => {
+    visit(tree, "element", (node: Element) => {
+      if (node.tagName !== "pre") return;
+
+      const codeChild = node.children.find(
+        (c): c is Element => c.type === "element" && c.tagName === "code",
+      );
+      if (codeChild) {
+        node.properties = node.properties || {};
+        node.properties["data-raw"] = toString(codeChild);
+      }
+    });
+  };
+}
+
 async function renderMarkdown(content: string, headings: TocItem[]) {
   return MarkdownAsync({
     children: content,
@@ -43,6 +62,7 @@ async function renderMarkdown(content: string, headings: TocItem[]) {
     rehypePlugins: [
       rehypeSlug,
       collectHeadings(headings),
+      extractRawCode(),
       [
         rehypePrettyCode,
         {
@@ -53,6 +73,9 @@ async function renderMarkdown(content: string, headings: TocItem[]) {
         },
       ],
     ],
+    components: {
+      pre: CodeBlock,
+    },
   });
 }
 

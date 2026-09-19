@@ -330,6 +330,7 @@
     border: 1px solid hsl(var(--border));
     background: hsl(var(--muted) / 0.4);
     overflow: hidden;
+    position: relative;
   }
   .markdown-body figure[data-rehype-pretty-code-figure] pre {
     margin: 0;

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Mail, Rss } from "lucide-react";
 import { isAdmin } from "@/auth";
 import { NavLinks } from "@/components/blog/nav-links";
+import { ReadingProgressBar } from "@/components/blog/reading-progress-bar";
 import { SearchDialog } from "@/components/blog/search-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 
@@ -95,6 +96,7 @@ export default async function BlogLayout({ children }: { children: React.ReactNo
             <ThemeToggle />
           </div>
         </div>
+        <ReadingProgressBar />
       </header>
 
       <main className="relative z-10 mx-auto w-full max-w-[var(--wrap)] flex-1 px-4 py-12 sm:px-6 sm:py-16">

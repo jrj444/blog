@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { TableOfContents } from "./table-of-contents";
 
 import { CodeBlock } from "./code-block";
+import { CalloutBlock } from "./callout-block";
+import { ZoomableImage } from "./zoomable-image";
 
 type MarkdownProps = {
   content: string;
@@ -126,6 +128,8 @@ async function renderMarkdown(content: string, headings: TocItem[]) {
     ],
     components: {
       pre: CodeBlock,
+      blockquote: CalloutBlock,
+      img: ZoomableImage,
     },
   });
 }

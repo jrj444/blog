@@ -158,7 +158,7 @@ export async function MarkdownWithToc({ content, className, footer }: MarkdownWi
       className={cn(hasToc && "xl:grid xl:grid-cols-[minmax(0,48rem)_15rem] xl:gap-12", className)}
     >
       {hasToc ? <TableOfContents items={headings} /> : null}
-      <div className={cn("mx-auto max-w-3xl min-w-0 xl:mx-0", hasToc && "mt-8 xl:order-1 xl:mt-0")}>
+      <div className={cn("mx-auto max-w-3xl min-w-0 xl:mx-0", hasToc && "xl:order-1")}>
         <div className="markdown-body">{rendered}</div>
         {footer}
       </div>

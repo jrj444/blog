@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, List } from "lucide-react";
+import { List } from "lucide-react";
 import type { TocItem } from "@/lib/markdown-toc";
 import { cn } from "@/lib/utils";
+import { RegisterToc, useFloatingActions } from "./floating-actions-context";
 
 type TableOfContentsProps = {
   items: TocItem[];
@@ -28,10 +29,7 @@ function TocList({ items, activeId, onSelect, className }: TocListProps) {
             <a
               href={`#${item.id}`}
               aria-current={active ? "location" : undefined}
-              onClick={(event) => {
-                onSelect(item.id);
-                event.currentTarget.closest("details")?.removeAttribute("open");
-              }}
+              onClick={() => onSelect(item.id)}
               className={cn(
                 "-ml-px block border-l-2 py-1.5 text-[12px] leading-5 transition-colors",
                 item.level === 3 ? "pl-6" : "pl-3",
@@ -50,7 +48,10 @@ function TocList({ items, activeId, onSelect, className }: TocListProps) {
 }
 
 export function TableOfContents({ items, className }: TableOfContentsProps) {
-  const [activeId, setActiveId] = useState(items[0]?.id ?? "");
+  const { activeHeadingId, setActiveHeadingId } = useFloatingActions();
+  const [localActiveId, setLocalActiveId] = useState(items[0]?.id ?? "");
+
+  const activeId = activeHeadingId || localActiveId;
 
   useEffect(() => {
     const headings = items
@@ -66,7 +67,9 @@ export function TableOfContents({ items, className }: TableOfContentsProps) {
         window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4;
 
       if (pageBottom) {
-        setActiveId(headings.at(-1)?.id ?? "");
+        const lastId = headings.at(-1)?.id ?? "";
+        setLocalActiveId(lastId);
+        setActiveHeadingId(lastId);
         return;
       }
 
@@ -79,7 +82,8 @@ export function TableOfContents({ items, className }: TableOfContentsProps) {
         }
       }
 
-      setActiveId(current);
+      setLocalActiveId(current);
+      setActiveHeadingId(current);
     };
 
     const scheduleUpdate = () => {
@@ -107,35 +111,33 @@ export function TableOfContents({ items, className }: TableOfContentsProps) {
       window.removeEventListener("resize", scheduleUpdate);
       window.removeEventListener("hashchange", scheduleUpdate);
     };
-  }, [items]);
+  }, [items, setActiveHeadingId]);
 
   return (
-    <div
-      className={cn("sticky top-[4.5rem] z-40 min-w-0 xl:static xl:z-auto xl:order-2", className)}
-    >
-      <details className="group overflow-hidden rounded-xl border border-border bg-background shadow-sm open:fixed open:inset-x-4 open:top-[4.5rem] open:z-[60] open:shadow-lg xl:hidden">
-        <summary className="flex list-none items-center gap-2 px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
-          <List aria-hidden className="size-4 text-primary" />
-          本文目录
-          <ChevronDown
-            aria-hidden
-            className="ml-auto size-4 text-muted-foreground transition-transform group-open:rotate-180"
-          />
-        </summary>
-        <nav aria-label="文章目录" className="border-t border-border px-4 py-3">
-          <TocList items={items} activeId={activeId} onSelect={setActiveId} />
-        </nav>
-      </details>
+    <>
+      {/* 向全局浮动岛注册大纲 items */}
+      <RegisterToc items={items} />
 
-      <nav aria-label="文章目录" className="hidden xl:sticky xl:top-24 xl:block">
-        <div>
-          <p className="flex items-center gap-2 text-[10.5px] font-medium tracking-[0.13em] text-muted-foreground uppercase">
-            <List aria-hidden className="size-3.5" />
-            本文目录
-          </p>
-          <TocList items={items} activeId={activeId} onSelect={setActiveId} className="mt-3 pr-2" />
-        </div>
-      </nav>
-    </div>
+      {/* 桌面端保留优雅的粘性目录，移动端已交由全局右下角抽屉浮动岛接管 */}
+      <div className={cn("hidden xl:static xl:order-2 xl:block xl:min-w-0", className)}>
+        <nav aria-label="文章目录" className="xl:sticky xl:top-24">
+          <div>
+            <p className="flex items-center gap-2 text-[10.5px] font-medium tracking-[0.13em] text-muted-foreground uppercase">
+              <List aria-hidden className="size-3.5" />
+              本文目录
+            </p>
+            <TocList
+              items={items}
+              activeId={activeId}
+              onSelect={(id) => {
+                setLocalActiveId(id);
+                setActiveHeadingId(id);
+              }}
+              className="mt-3 pr-2"
+            />
+          </div>
+        </nav>
+      </div>
+    </>
   );
 }

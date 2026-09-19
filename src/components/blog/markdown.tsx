@@ -38,7 +38,47 @@ function collectHeadings(headings: TocItem[]) {
   };
 }
 
-/** 在 rehype-pretty-code 语法高亮前提取纯文本代码，挂载到 pre 上供复制代码使用 */
+/** 从 <code> 节点的 meta 或类名中提取文件名、行号等元信息 */
+function parseCodeMeta(codeChild: Element): { title?: string; showLineNumbers?: boolean } {
+  const data = codeChild.data as Record<string, unknown> | undefined;
+  const rawMeta =
+    typeof data?.meta === "string"
+      ? data.meta
+      : typeof codeChild.properties?.metastring === "string"
+        ? (codeChild.properties.metastring as string)
+        : "";
+
+  let title: string | undefined;
+  let showLineNumbers = false;
+
+  // 1. 匹配 title="..." 或 title='...' 或 title=...
+  const titleMatch = rawMeta.match(/title=(?:"([^"]+)"|'([^']+)'|([^\s]+))/);
+  if (titleMatch) {
+    title = titleMatch[1] || titleMatch[2] || titleMatch[3];
+  }
+
+  // 2. 匹配 :filename 格式，例如 language-ts:src/lib/db.ts
+  if (!title && Array.isArray(codeChild.properties?.className)) {
+    for (const cls of codeChild.properties.className) {
+      if (typeof cls === "string") {
+        const colonMatch = cls.match(/^language-[^:]+:(.+)$/);
+        if (colonMatch) {
+          title = colonMatch[1];
+          break;
+        }
+      }
+    }
+  }
+
+  // 3. 检查是否有 showLineNumbers 声明
+  if (rawMeta.includes("showLineNumbers") || rawMeta.includes("lineNumbers")) {
+    showLineNumbers = true;
+  }
+
+  return { title, showLineNumbers };
+}
+
+/** 在 rehype-pretty-code 语法高亮前提取纯文本代码与元数据，挂载到 pre 上供 CodeBlock 使用 */
 function extractRawCode() {
   return () => (tree: Root) => {
     visit(tree, "element", (node: Element) => {
@@ -48,8 +88,19 @@ function extractRawCode() {
         (c): c is Element => c.type === "element" && c.tagName === "code",
       );
       if (codeChild) {
+        const rawCode = toString(codeChild);
+        const { title, showLineNumbers } = parseCodeMeta(codeChild);
+        const lineCount = rawCode ? rawCode.split("\n").length : 0;
+
         node.properties = node.properties || {};
-        node.properties["data-raw"] = toString(codeChild);
+        node.properties["data-raw"] = rawCode;
+        if (title) {
+          node.properties["data-title"] = title;
+        }
+        if (showLineNumbers) {
+          node.properties["data-show-lines"] = "true";
+        }
+        node.properties["data-line-count"] = String(lineCount);
       }
     });
   };

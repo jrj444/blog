@@ -557,3 +557,45 @@
     scroll-behavior: auto;
   }
 }
+
+/* ===== 原生 View Transitions 电影级平滑转场 ===== */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.22s;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* ===== 代码块行号与标题集成 ===== */
+.code-with-lines code {
+  counter-reset: line-number;
+}
+
+.code-with-lines [data-line]::before {
+  counter-increment: line-number;
+  content: counter(line-number);
+  display: inline-block;
+  width: 1.6rem;
+  margin-right: 1.25rem;
+  text-align: right;
+  color: hsl(var(--muted-foreground));
+  opacity: 0.35;
+  user-select: none;
+  font-size: 0.85em;
+}
+
+/* 隐藏 rehype-pretty-code 默认的粗糙 title，统一由 CodeBlock 顶栏精细化渲染 */
+[data-rehype-pretty-code-title] {
+  display: none;
+}

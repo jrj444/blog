@@ -3,8 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Eye } from "lucide-react";
 import type { Metadata } from "next";
-import { getPublishedPostBySlug } from "@/lib/db/queries";
+import { getPublishedPostBySlug, getPostSiblings } from "@/lib/db/queries";
 import { MarkdownWithToc } from "@/components/blog/markdown";
+import { PostNavigation } from "@/components/blog/post-navigation";
 import { TagBadge } from "@/components/blog/tag-badge";
 import { ViewTracker } from "@/components/blog/view-tracker";
 import { formatDate, toIsoString } from "@/lib/format-date";
@@ -56,6 +57,8 @@ export default async function PostPage({ params }: Props) {
   if (!post) {
     notFound();
   }
+
+  const { prev, next } = await getPostSiblings(post.id);
 
   return (
     <article className="mx-auto max-w-[68rem]">
@@ -109,14 +112,17 @@ export default async function PostPage({ params }: Props) {
         content={post.contentMd}
         className="mt-8"
         footer={
-          <footer className="mt-14 border-t pt-6">
-            <Link
-              href="/posts"
-              className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ArrowLeft aria-hidden className="size-4" />
-              返回文章列表
-            </Link>
+          <footer className="mt-14 space-y-6 border-t border-border pt-6">
+            <PostNavigation prev={prev} next={next} />
+            <div className="pt-2">
+              <Link
+                href="/posts"
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ArrowLeft aria-hidden className="size-4" />
+                返回文章列表
+              </Link>
+            </div>
           </footer>
         }
       />

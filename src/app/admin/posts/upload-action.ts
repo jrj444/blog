@@ -22,6 +22,7 @@ const requestSchema = z.object({
     .int()
     .positive()
     .max(MAX_UPLOAD_BYTES, `图片不能超过 ${MAX_UPLOAD_BYTES / 1024 / 1024}MB`),
+  prefix: z.enum(["covers", "posts"]).optional(),
 });
 
 export type CreateCoverUploadResult =
@@ -40,6 +41,7 @@ export type CreateCoverUploadResult =
 export async function createCoverUploadAction(input: {
   type: string;
   size: number;
+  prefix?: "covers" | "posts";
 }): Promise<CreateCoverUploadResult> {
   // 安全边界：必须是管理员
   if (!(await isAdmin())) return { ok: false, error: "未授权" };
@@ -53,7 +55,7 @@ export async function createCoverUploadAction(input: {
   }
 
   try {
-    const key = buildObjectKey(parsed.data.type);
+    const key = buildObjectKey(parsed.data.type, parsed.data.prefix ?? "covers");
     const target = await createUploadTarget({ key, contentType: parsed.data.type });
     return { ok: true, ...target };
   } catch (error) {

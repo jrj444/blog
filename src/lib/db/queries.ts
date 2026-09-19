@@ -1,7 +1,21 @@
 import { unstable_cache } from "next/cache";
 import { db, queryWithRetry } from "@/lib/db";
 import { posts } from "@/lib/db/schema";
-import { count, eq, and, or, ilike, arrayContains, desc, sql, type SQL } from "drizzle-orm";
+import {
+  count,
+  eq,
+  ne,
+  and,
+  or,
+  ilike,
+  arrayContains,
+  desc,
+  asc,
+  lt,
+  gt,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 import { slugify, type PostInput } from "@/lib/validators/post";
 import { escapeLike, normalizeSearchTerm } from "@/lib/db/search";
 
@@ -310,6 +324,66 @@ export const getPublishedPostBySlug = cached(
       where: and(eq(posts.slug, slug), eq(posts.published, true)),
     })) ?? null,
 );
+
+export type PostSibling = {
+  slug: string;
+  title: string;
+} | null;
+
+export type PostSiblingsResult = {
+  prev: PostSibling;
+  next: PostSibling;
+};
+
+/**
+ * 获取指定文章的上一篇与下一篇（仅限已发布）。
+ * 针对当前文章的 id 查询其精准数据库 created_at，杜绝 JS Date 序列化微秒精度截断导致的自匹配问题。
+ * 并显式排除当前文章自身（ne(posts.id, postId)）。
+ * 上一篇（prev）：发布时间早于当前文章，按时间倒序取第 1 篇
+ * 下一篇（next）：发布时间晚于当前文章，按时间正序取第 1 篇
+ */
+async function queryPostSiblings(postId: string): Promise<PostSiblingsResult> {
+  const currentCreatedAtSql = sql`(select ${posts.createdAt} from ${posts} where ${posts.id} = ${postId}::uuid)`;
+
+  const [prevRow] = await db
+    .select({ slug: posts.slug, title: posts.title })
+    .from(posts)
+    .where(
+      and(
+        eq(posts.published, true),
+        ne(posts.id, postId),
+        or(
+          lt(posts.createdAt, currentCreatedAtSql),
+          and(eq(posts.createdAt, currentCreatedAtSql), sql`${posts.id} < ${postId}::uuid`),
+        ),
+      ),
+    )
+    .orderBy(desc(posts.createdAt), desc(posts.id))
+    .limit(1);
+
+  const [nextRow] = await db
+    .select({ slug: posts.slug, title: posts.title })
+    .from(posts)
+    .where(
+      and(
+        eq(posts.published, true),
+        ne(posts.id, postId),
+        or(
+          gt(posts.createdAt, currentCreatedAtSql),
+          and(eq(posts.createdAt, currentCreatedAtSql), sql`${posts.id} > ${postId}::uuid`),
+        ),
+      ),
+    )
+    .orderBy(asc(posts.createdAt), asc(posts.id))
+    .limit(1);
+
+  return {
+    prev: prevRow ?? null,
+    next: nextRow ?? null,
+  };
+}
+
+export const getPostSiblings = cached("post-siblings", queryPostSiblings);
 
 /**
  * 首页统计：总数 / 本年发布数 / 最近更新时间（单次查询）。

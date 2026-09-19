@@ -29,11 +29,11 @@ export default async function Image({ params }: Props) {
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        backgroundColor: "#071013",
+        backgroundColor: "#09090b",
         backgroundImage:
-          "radial-gradient(circle at 95% 5%, rgba(45, 105, 95, 0.42) 0%, transparent 48%), radial-gradient(circle at 5% 95%, rgba(30, 70, 65, 0.3) 0%, transparent 40%)",
+          "radial-gradient(circle at 95% 5%, rgba(255, 255, 255, 0.12) 0%, transparent 48%), radial-gradient(circle at 5% 95%, rgba(255, 255, 255, 0.05) 0%, transparent 40%)",
         padding: "64px 72px",
-        color: "#f0fdf9",
+        color: "#fafafa",
       }}
     >
       {/* 顶部品牌 */}
@@ -49,8 +49,8 @@ export default async function Image({ params }: Props) {
             width: "40px",
             height: "40px",
             borderRadius: "9px",
-            backgroundColor: "#2dd4bf",
-            color: "#042f2e",
+            backgroundColor: "#ffffff",
+            color: "#09090b",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -72,7 +72,7 @@ export default async function Image({ params }: Props) {
               fontSize: "18px",
               fontWeight: 700,
               letterSpacing: "0.08em",
-              color: "#f0fdf9",
+              color: "#fafafa",
             }}
           >
             JIANG RUIJIAN
@@ -81,7 +81,7 @@ export default async function Image({ params }: Props) {
             style={{
               fontSize: "12px",
               letterSpacing: "0.16em",
-              color: "#5eead4",
+              color: "#a1a1aa",
               textTransform: "uppercase",
             }}
           >
@@ -154,9 +154,9 @@ export default async function Image({ params }: Props) {
               style={{
                 padding: "6px 14px",
                 borderRadius: "9999px",
-                backgroundColor: "rgba(45, 212, 191, 0.12)",
-                border: "1px solid rgba(45, 212, 191, 0.28)",
-                color: "#5eead4",
+                backgroundColor: "rgba(255, 255, 255, 0.08)",
+                border: "1px solid rgba(255, 255, 255, 0.16)",
+                color: "#f4f4f5",
                 fontSize: "14px",
                 fontWeight: 500,
               }}
@@ -169,7 +169,7 @@ export default async function Image({ params }: Props) {
         <div
           style={{
             fontSize: "15px",
-            color: "#64748b",
+            color: "#71717a",
             fontWeight: 500,
             letterSpacing: "0.05em",
           }}

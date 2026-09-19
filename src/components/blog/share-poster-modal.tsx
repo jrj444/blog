@@ -115,40 +115,40 @@ function SharePosterContent({ post, onClose }: { post: SharePosterData; onClose:
         canvas.width = width;
         canvas.height = height;
 
-        // 1. 深色渐变背景
+        // 1. 深色渐变背景 (Vercel / Linear 黑曜石深色)
         const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-        bgGrad.addColorStop(0, "#071215");
-        bgGrad.addColorStop(0.5, "#0b1d22");
-        bgGrad.addColorStop(1, "#04090b");
+        bgGrad.addColorStop(0, "#09090b");
+        bgGrad.addColorStop(0.5, "#121216");
+        bgGrad.addColorStop(1, "#050507");
         ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, width, height);
 
-        // 2. 径向光晕装饰 (右上青色 + 左下微蓝)
+        // 2. 径向星光微漫射 (纯净银白微晕，彻底去绿)
         const topGlow = ctx.createRadialGradient(900, 180, 0, 900, 180, 500);
-        topGlow.addColorStop(0, "rgba(45, 212, 191, 0.16)");
+        topGlow.addColorStop(0, "rgba(255, 255, 255, 0.08)");
         topGlow.addColorStop(1, "transparent");
         ctx.fillStyle = topGlow;
         ctx.fillRect(0, 0, width, height);
 
         const bottomGlow = ctx.createRadialGradient(150, 1250, 0, 150, 1250, 460);
-        bottomGlow.addColorStop(0, "rgba(20, 184, 166, 0.12)");
+        bottomGlow.addColorStop(0, "rgba(255, 255, 255, 0.05)");
         bottomGlow.addColorStop(1, "transparent");
         ctx.fillStyle = bottomGlow;
         ctx.fillRect(0, 0, width, height);
 
         // 3. 内嵌精致卡片边框
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.12)";
         ctx.lineWidth = 1.5;
         drawRoundRect(ctx, 48, 48, width - 96, height - 96, 24);
         ctx.stroke();
 
         // 4. 顶部品牌区域 (Y: 96 ~ 180)
-        // JR 徽标
-        ctx.fillStyle = "#2dd4bf";
+        // JR 徽标 (黑白对比)
+        ctx.fillStyle = "#ffffff";
         drawRoundRect(ctx, 96, 96, 68, 68, 14);
         ctx.fill();
 
-        ctx.fillStyle = "#042f2e";
+        ctx.fillStyle = "#09090b";
         ctx.font = "bold 32px serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -157,11 +157,11 @@ function SharePosterContent({ post, onClose }: { post: SharePosterData; onClose:
         // 品牌文字
         ctx.textAlign = "left";
         ctx.textBaseline = "alphabetic";
-        ctx.fillStyle = "#f0fdf9";
+        ctx.fillStyle = "#fafafa";
         ctx.font = "bold 26px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
         ctx.fillText("JIANG RUIJIAN", 182, 128);
 
-        ctx.fillStyle = "#5eead4";
+        ctx.fillStyle = "#a1a1aa";
         ctx.font = "bold 13px -apple-system, BlinkMacSystemFont, sans-serif";
         ctx.fillText("TECHNICAL JOURNAL · POSTER", 182, 154);
 
@@ -179,16 +179,16 @@ function SharePosterContent({ post, onClose }: { post: SharePosterData; onClose:
           const tagText = `#${tag}`;
           const tagWidth = ctx.measureText(tagText).width + 30;
 
-          ctx.fillStyle = "rgba(45, 212, 191, 0.12)";
+          ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
           drawRoundRect(ctx, tagX, 230, tagWidth, 38, 19);
           ctx.fill();
 
-          ctx.strokeStyle = "rgba(45, 212, 191, 0.3)";
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.16)";
           ctx.lineWidth = 1;
           drawRoundRect(ctx, tagX, 230, tagWidth, 38, 19);
           ctx.stroke();
 
-          ctx.fillStyle = "#5eead4";
+          ctx.fillStyle = "#e4e4e7";
           ctx.fillText(tagText, tagX + 15, 256);
           tagX += tagWidth + 14;
         }
@@ -212,18 +212,18 @@ function SharePosterContent({ post, onClose }: { post: SharePosterData; onClose:
           drawRoundRect(ctx, 96, currentY, excerptWidth, 180, 16);
           ctx.fill();
 
-          ctx.strokeStyle = "rgba(45, 212, 191, 0.22)";
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.14)";
           ctx.lineWidth = 1;
           drawRoundRect(ctx, 96, currentY, excerptWidth, 180, 16);
           ctx.stroke();
 
           // 左侧装饰主色粗条
-          ctx.fillStyle = "#2dd4bf";
+          ctx.fillStyle = "#ffffff";
           drawRoundRect(ctx, 96, currentY, 6, 180, 3);
           ctx.fill();
 
           // 摘要文本
-          ctx.fillStyle = "#cbd5e1";
+          ctx.fillStyle = "#d4d4d8";
           drawWrappedText(
             ctx,
             post.excerpt,
@@ -251,12 +251,12 @@ function SharePosterContent({ post, onClose }: { post: SharePosterData; onClose:
         ctx.lineTo(width - 96, 1140);
         ctx.stroke();
 
-        // 生成二维码图片
+        // 生成二维码图片 (黑白)
         const qrDataUrl = await QRCode.toDataURL(post.url, {
           width: 220,
           margin: 1,
           color: {
-            dark: "#042f2e",
+            dark: "#09090b",
             light: "#ffffff",
           },
         });
@@ -282,11 +282,11 @@ function SharePosterContent({ post, onClose }: { post: SharePosterData; onClose:
         ctx.font = "bold 26px -apple-system, BlinkMacSystemFont, sans-serif";
         ctx.fillText("长按或扫码阅读全文", qrX + qrSize + 32, qrY + 48);
 
-        ctx.fillStyle = "#5eead4";
+        ctx.fillStyle = "#a1a1aa";
         ctx.font = "italic 20px -apple-system, BlinkMacSystemFont, 'Times New Roman', serif";
         ctx.fillText("Life cannot be replayed, so why not be greedy", qrX + qrSize + 32, qrY + 92);
 
-        ctx.fillStyle = "#64748b";
+        ctx.fillStyle = "#71717a";
         ctx.font = "500 18px ui-monospace, SFMono-Regular, monospace";
         ctx.fillText("jiangruijian.com", qrX + qrSize + 32, qrY + 132);
 

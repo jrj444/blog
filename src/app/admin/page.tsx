@@ -1,23 +1,49 @@
 import Link from "next/link";
-import { ExternalLink, FilePlus, PenLine, Rss } from "lucide-react";
-import { getDashboardStats, listRecentPosts, listTagsWithCountsUncached } from "@/lib/db/queries";
+import { ExternalLink, Eye, FilePlus, Flame, PenLine, Rss } from "lucide-react";
+import {
+  getDashboardStats,
+  listRecentPosts,
+  listTopViewedPosts,
+  listTagsWithCountsUncached,
+} from "@/lib/db/queries";
 import { formatDate } from "@/lib/format-date";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
-  const [stats, recent, tags] = await Promise.all([
+  const [stats, recent, topPosts, tags] = await Promise.all([
     getDashboardStats(),
     listRecentPosts(5),
+    listTopViewedPosts(5),
     listTagsWithCountsUncached(),
   ]);
 
   const cards = [
-    { label: "已发布", value: stats.published, hint: "公开可见" },
-    { label: "草稿", value: stats.drafts, hint: "待整理" },
-    { label: "今年发布", value: stats.thisYear, hint: new Date().getFullYear() + " 年" },
-    { label: "总阅读量", value: stats.views, hint: "累计" },
+    {
+      label: "已发布",
+      value: stats.published,
+      hint: "公开可见",
+      href: "/admin/posts?status=published",
+    },
+    {
+      label: "草稿",
+      value: stats.drafts,
+      hint: "待整理",
+      href: "/admin/posts?status=draft",
+    },
+    {
+      label: "今年发布",
+      value: stats.thisYear,
+      hint: new Date().getFullYear() + " 年",
+      href: "/admin/posts",
+    },
+    {
+      label: "总阅读量",
+      value: stats.views,
+      hint: "累计总人次",
+      href: "/admin/posts",
+    },
   ];
 
   const quickLinks = [
@@ -31,7 +57,7 @@ export default async function AdminDashboardPage() {
     <div className="space-y-7">
       <AdminPageHeader
         title="仪表盘"
-        description="查看站点内容状态、最近更新与标签分布。"
+        description="查看站点内容状态、最近更新、热门阅读与标签分布。"
         actions={
           <Link
             href="/admin/posts/new"
@@ -43,21 +69,26 @@ export default async function AdminDashboardPage() {
         }
       />
 
+      {/* KPI 卡片 */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="内容统计">
         {cards.map((card) => (
-          <div
+          <Link
             key={card.label}
-            className="rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-foreground/15 sm:p-5"
+            href={card.href}
+            className="group rounded-xl border border-border bg-card p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md sm:p-5"
           >
-            <p className="text-[10.5px] font-medium tracking-[0.13em] text-muted-foreground uppercase">
+            <p className="text-[10.5px] font-medium tracking-[0.13em] text-muted-foreground uppercase transition-colors group-hover:text-primary">
               {card.label}
             </p>
-            <p className="mt-3 font-serif text-3xl font-bold tabular-nums">{card.value}</p>
-            <p className="mt-1.5 text-xs text-muted-foreground">{card.hint}</p>
-          </div>
+            <p className="mt-3 font-serif text-3xl font-bold text-foreground tabular-nums transition-colors group-hover:text-primary">
+              {card.value}
+            </p>
+            <p className="mt-1.5 text-xs text-muted-foreground">{card.hint} →</p>
+          </Link>
         ))}
       </section>
 
+      {/* 快捷操作 */}
       <section>
         <h2 className="mb-3 text-[10.5px] font-medium tracking-[0.13em] text-muted-foreground uppercase">
           快捷操作
@@ -76,7 +107,9 @@ export default async function AdminDashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+      {/* 三列看板 */}
+      <section className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+        {/* 最近更新 */}
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
           <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
             <div>
@@ -87,7 +120,7 @@ export default async function AdminDashboardPage() {
               href="/admin/posts"
               className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              全部文章 →
+              全部 →
             </Link>
           </div>
           <ul className="divide-y divide-border/70">
@@ -99,7 +132,9 @@ export default async function AdminDashboardPage() {
               recent.map((post) => (
                 <li key={post.id} className="flex items-center gap-3 px-5 py-3.5">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{post.title}</p>
+                    <p className="truncate text-sm font-medium" title={post.title}>
+                      {post.title}
+                    </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       {formatDate(post.updatedAt)} · {post.views} 阅读
                     </p>
@@ -125,7 +160,73 @@ export default async function AdminDashboardPage() {
           </ul>
         </div>
 
+        {/* 热门阅读 Top 5 */}
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-4">
+            <div>
+              <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+                <Flame aria-hidden className="size-4 text-orange-500" />
+                热门阅读 Top 5
+              </h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">阅读量最高的文章排行</p>
+            </div>
+          </div>
+          <ul className="divide-y divide-border/70">
+            {topPosts.length === 0 ? (
+              <li className="px-5 py-12 text-center text-sm text-muted-foreground">
+                暂无已发布文章数据。
+              </li>
+            ) : (
+              topPosts.map((post, idx) => (
+                <li key={post.id} className="flex items-center gap-3 px-5 py-3.5">
+                  <span
+                    className={
+                      "flex size-5 shrink-0 items-center justify-center rounded-full font-mono text-xs font-semibold " +
+                      (idx === 0
+                        ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                        : idx === 1
+                          ? "bg-slate-500/15 text-slate-600 dark:text-slate-400"
+                          : idx === 2
+                            ? "bg-orange-500/15 text-orange-600 dark:text-orange-400"
+                            : "bg-muted text-muted-foreground")
+                    }
+                  >
+                    {idx + 1}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium" title={post.title}>
+                      {post.title}
+                    </p>
+                    <p className="mt-1 flex items-center gap-1 font-mono text-xs text-muted-foreground">
+                      <Eye aria-hidden className="size-3" />
+                      <span>{post.views} 阅读</span>
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <Link
+                      href={`/posts/${post.slug}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="前台预览"
+                      className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <ExternalLink aria-hidden className="size-3.5" />
+                    </Link>
+                    <Link
+                      href={"/admin/posts/" + post.id}
+                      className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      编辑
+                    </Link>
+                  </div>
+                </li>
+              ))
+            )}
+          </ul>
+        </div>
+
+        {/* 标签分布 */}
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:col-span-2 xl:col-span-1">
           <div className="border-b border-border px-5 py-4">
             <h2 className="text-sm font-semibold">标签分布</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">当前文章使用的全部标签</p>

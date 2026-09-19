@@ -108,23 +108,75 @@ function cached<TArgs extends unknown[], TResult>(
 
 // ---------- 后台查询（不缓存） ----------
 
-// 后台列表：全部（含草稿），分页
-export async function listPosts(page = 1, pageSize = 10) {
+export type ListPostsParams = {
+  page?: number;
+  pageSize?: number;
+  status?: "all" | "published" | "draft";
+  q?: string;
+};
+
+// 后台列表：支持状态筛选（全部/已发布/草稿）、搜索、分页
+export async function listPosts(paramsOrPage: ListPostsParams | number = 1, maybePageSize = 10) {
+  const options: ListPostsParams =
+    typeof paramsOrPage === "number"
+      ? { page: paramsOrPage, pageSize: maybePageSize }
+      : paramsOrPage;
+  const { page = 1, pageSize = 10, status = "all", q } = options;
+
   return queryWithRetry(async () => {
     const offset = (page - 1) * pageSize;
+    const search = normalizeSearchTerm(q);
+    const pattern = search ? `%${escapeLike(search.term)}%` : null;
+
+    // 1) 聚合获取全局各状态总数（不受当前 status / search 影响，供 Tab 徽章展示）
+    const countRows = await db.execute(sql`
+      select
+        count(*)::int as total,
+        count(*) filter (where ${posts.published})::int as published,
+        count(*) filter (where not ${posts.published})::int as draft
+      from ${posts}
+    `);
+    const countRow = firstRow(countRows as ReadonlyArray<Record<string, number>>);
+    const counts = {
+      all: countRow?.total ?? 0,
+      published: countRow?.published ?? 0,
+      draft: countRow?.draft ?? 0,
+    };
+
+    // 2) 组装当前筛选条件
+    const conditions: SQL[] = [];
+    if (status === "published") {
+      conditions.push(eq(posts.published, true));
+    } else if (status === "draft") {
+      conditions.push(eq(posts.published, false));
+    }
+
+    if (pattern) {
+      conditions.push(
+        or(
+          ilike(posts.title, pattern),
+          ilike(posts.slug, pattern),
+          ilike(posts.excerpt, pattern),
+        ) as SQL,
+      );
+    }
+
+    const where = conditions.length > 0 ? and(...conditions) : undefined;
 
     const rows = await db
       .select()
       .from(posts)
+      .where(where)
       .orderBy(desc(posts.createdAt))
       .limit(pageSize)
       .offset(offset);
 
-    const [{ value: total }] = await db.select({ value: count() }).from(posts);
+    const [{ value: total }] = await db.select({ value: count() }).from(posts).where(where);
 
     return {
       posts: rows,
       total,
+      counts,
       page,
       pageSize,
       hasMore: offset + rows.length < total,
@@ -140,6 +192,18 @@ export function getPostById(id: string) {
 // 后台仪表盘：最近更新的文章（含草稿），按更新时间倒序
 export function listRecentPosts(limit = 5) {
   return queryWithRetry(() => db.select().from(posts).orderBy(desc(posts.updatedAt)).limit(limit));
+}
+
+// 后台仪表盘：阅读量最高的前 N 篇已发布文章
+export function listTopViewedPosts(limit = 5) {
+  return queryWithRetry(() =>
+    db
+      .select()
+      .from(posts)
+      .where(eq(posts.published, true))
+      .orderBy(desc(posts.views), desc(posts.createdAt))
+      .limit(limit),
+  );
 }
 
 // 后台仪表盘统计：已发表 / 草稿 / 今年发布 / 总阅读量。

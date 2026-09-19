@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Feather, Search } from "lucide-react";
+import { Feather } from "lucide-react";
 import type { Metadata } from "next";
 import { listPublishedPosts } from "@/lib/db/queries";
 import { PostCard } from "@/components/blog/post-card";
@@ -50,25 +50,9 @@ export default async function PostsPage({ searchParams }: { searchParams: Promis
         </p>
       </header>
 
-      <form action="/posts" role="search" className="mt-6">
-        <div className="relative max-w-md">
-          <Search
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground/70"
-          />
-          <input
-            type="search"
-            name="q"
-            defaultValue={q}
-            placeholder="搜索文章标题或内容…"
-            className="h-10 w-full rounded-md border border-border bg-background pr-3 pl-9 text-sm text-foreground placeholder:text-muted-foreground/70 focus-visible:border-foreground/30 focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-          />
-        </div>
-      </form>
-
       {q && (
-        <p className="mt-3 text-sm text-muted-foreground">
-          搜索「{q}」的结果,共 {total} 篇 ·{" "}
+        <p className="mt-4 text-sm text-muted-foreground">
+          搜索「{q}」的结果，共 {total} 篇 ·{" "}
           <Link
             href="/posts"
             className="underline underline-offset-4 transition-colors hover:text-foreground"

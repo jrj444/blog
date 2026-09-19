@@ -9,6 +9,7 @@ import { PostNavigation } from "@/components/blog/post-navigation";
 import { TagBadge } from "@/components/blog/tag-badge";
 import { ViewTracker } from "@/components/blog/view-tracker";
 import { formatDate, toIsoString } from "@/lib/format-date";
+import { siteConfig, absUrl } from "@/lib/site";
 
 // 页面数据来自数据库,每次请求实时渲染(构建期不访问数据库)。
 export const dynamic = "force-dynamic";
@@ -39,13 +40,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       title: post.title,
       description: post.excerpt ?? undefined,
       publishedTime: toIsoString(post.createdAt),
-      images: post.coverImage ? [{ url: post.coverImage }] : undefined,
+      // 有显式封面图时使用；未提供时留空，Next.js 会自动使用同路由下的 opengraph-image.tsx 生成 1200x630 海报
+      ...(post.coverImage ? { images: [{ url: post.coverImage }] } : {}),
     },
     twitter: {
-      card: post.coverImage ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title: post.title,
       description: post.excerpt ?? undefined,
-      images: post.coverImage ? [post.coverImage] : undefined,
+      ...(post.coverImage ? { images: [post.coverImage] } : {}),
     },
   };
 }
@@ -60,8 +62,37 @@ export default async function PostPage({ params }: Props) {
 
   const { prev, next } = await getPostSiblings(post.id);
 
+  const postUrl = absUrl(`/posts/${post.slug}`);
+  const ogImageUrl = post.coverImage || absUrl(`/posts/${post.slug}/opengraph-image`);
+
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: post.title,
+    description: post.excerpt ?? undefined,
+    datePublished: toIsoString(post.createdAt),
+    dateModified: toIsoString(post.updatedAt),
+    url: postUrl,
+    image: [ogImageUrl],
+    author: {
+      "@type": "Person",
+      name: siteConfig.name,
+      url: siteConfig.url,
+    },
+    publisher: {
+      "@type": "Person",
+      name: siteConfig.name,
+      url: siteConfig.url,
+    },
+    ...(post.tags.length > 0 ? { keywords: post.tags.join(", ") } : {}),
+  };
+
   return (
     <article className="mx-auto max-w-[68rem]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div className="mx-auto max-w-3xl xl:mx-0">
         <Link
           href="/posts"

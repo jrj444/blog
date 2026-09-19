@@ -13,7 +13,13 @@ const NAV_ITEMS = [
   { href: "/about", label: "About" },
 ] as const;
 
-export function NavLinks({ showAdmin = false }: { showAdmin?: boolean }) {
+export function NavLinks({
+  showAdmin = false,
+  className,
+}: {
+  showAdmin?: boolean;
+  className?: string;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -38,7 +44,7 @@ export function NavLinks({ showAdmin = false }: { showAdmin?: boolean }) {
     );
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={cn("flex items-center gap-2", className)}>
       {/* 桌面导航 */}
       <nav className="hidden items-center gap-6 md:flex">
         {items.map(({ href, label }) => {

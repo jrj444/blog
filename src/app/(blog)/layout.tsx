@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Mail, Rss } from "lucide-react";
 import { isAdmin } from "@/auth";
 import { NavLinks } from "@/components/blog/nav-links";
+import { SearchDialog } from "@/components/blog/search-dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const SITE_LINKS = [
@@ -88,8 +89,9 @@ export default async function BlogLayout({ children }: { children: React.ReactNo
             </span>
           </Link>
 
-          <div className="relative flex items-center gap-3">
-            <NavLinks showAdmin={showAdmin} />
+          <div className="relative flex items-center gap-2.5 sm:gap-3">
+            <NavLinks showAdmin={showAdmin} className="order-last md:order-first md:mr-2" />
+            <SearchDialog />
             <ThemeToggle />
           </div>
         </div>

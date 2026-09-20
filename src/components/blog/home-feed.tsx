@@ -1,6 +1,3 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
 import { Feather } from "lucide-react";
 import type { PostListItem } from "@/lib/db/queries";
@@ -16,10 +13,7 @@ const chip = (active: boolean) =>
   );
 
 export function HomeFeed({ posts, hasMore }: { posts: PostListItem[]; hasMore: boolean }) {
-  const [active, setActive] = useState<string | null>(null);
-  const filtered = active ? posts.filter((p) => p.tags.includes(active)) : posts;
-
-  // 标签筛选只在当前这一页内生效；标签全集来自当前页文章，避免首页多打一次全表查询。
+  // 从当前页文章提取标签集合（用于展示快捷跳转入口）
   const allTags = [...new Set(posts.flatMap((p) => p.tags))].sort((a, b) =>
     a.localeCompare(b, "zh-CN"),
   );
@@ -40,33 +34,31 @@ export function HomeFeed({ posts, hasMore }: { posts: PostListItem[]; hasMore: b
 
       {allTags.length > 0 && (
         <div className="mt-5 flex flex-wrap gap-2">
-          <button type="button" onClick={() => setActive(null)} className={chip(active === null)}>
+          {/* All 按钮：链接到首页本身（无 tag 筛选） */}
+          <Link href="/" className={chip(false)}>
             All
-          </button>
+          </Link>
           {allTags.map((tag) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => setActive(active === tag ? null : tag)}
-              className={chip(active === tag)}
-            >
+            // 点击标签跳转到全量标签页，避免只过滤当前页的 N 篇
+            <Link key={tag} href={`/tags/${encodeURIComponent(tag)}`} className={chip(false)}>
               #{tag}
-            </button>
+            </Link>
           ))}
         </div>
       )}
 
       <div className="mt-2 divide-y divide-border/70">
-        {filtered.length === 0 ? (
+        {posts.length === 0 ? (
           <div className="mt-8 flex flex-col items-center gap-2 rounded-lg border border-dashed px-6 py-16 text-center">
             <Feather aria-hidden className="mb-1 size-5 text-muted-foreground/50" />
-            <p className="text-sm font-medium">没有匹配的文章</p>
-            <p className="text-xs text-muted-foreground">换个标签试试,或清除筛选。</p>
+            <p className="text-sm font-medium">没有文章</p>
+            <p className="text-xs text-muted-foreground">文章发布后，会第一时间出现在这里。</p>
           </div>
         ) : (
-          filtered.map((post) => <PostCard key={post.id} post={post} />)
+          posts.map((post) => <PostCard key={post.id} post={post} />)
         )}
       </div>
     </section>
   );
 }
+

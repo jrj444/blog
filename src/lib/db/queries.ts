@@ -128,7 +128,7 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
     const search = normalizeSearchTerm(q);
     const pattern = search ? `%${escapeLike(search.term)}%` : null;
 
-    // 1) 聚合获取全局各状态总数（不受当前 status / search 影响，供 Tab 徽章展示）
+    // 1) 全局各状态总数（不受 status / search 影响，供 Tab 徽章展示）
     const countRows = await db.execute(sql`
       select
         count(*)::int as total,
@@ -163,15 +163,13 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
 
     const where = conditions.length > 0 ? and(...conditions) : undefined;
 
-    const rows = await db
-      .select()
-      .from(posts)
-      .where(where)
-      .orderBy(desc(posts.createdAt))
-      .limit(pageSize)
-      .offset(offset);
-
-    const [{ value: total }] = await db.select({ value: count() }).from(posts).where(where);
+    // 3) 分页数据 + 当前筛选 total 并发执行（两条查询同时发出，无串行等待）。
+    //    使用 Drizzle ORM .select() 而非 db.execute()，确保列名自动映射为 camelCase
+    //    （db.execute 返回原始 snake_case 列名，会导致 createdAt 等字段 undefined → Invalid Date）。
+    const [rows, [{ value: total }]] = await Promise.all([
+      db.select().from(posts).where(where).orderBy(desc(posts.createdAt)).limit(pageSize).offset(offset),
+      db.select({ value: count() }).from(posts).where(where),
+    ]);
 
     return {
       posts: rows,
@@ -183,6 +181,8 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
     };
   });
 }
+
+
 
 // 后台编辑页：按 id 取（含草稿）
 export function getPostById(id: string) {
@@ -380,6 +380,43 @@ async function queryListPublishedPosts(args: PublishedPostsArgs): Promise<Publis
 
 const cachedListPublishedPosts = cached("list-published", queryListPublishedPosts);
 
+/**
+ * 前台全局即时搜索（**不缓存**）。
+ *
+ * 与 listPublishedPosts 的区别：本函数绕过 unstable_cache，直接走 DB，
+ * 保证刚发布的文章能够立即出现在搜索结果里，而不受 60s 缓存窗口影响。
+ * 仅供 searchPublishedPostsAction 调用，不对外暴露完整分页结构。
+ */
+export async function searchPublishedPosts(
+  q: string,
+  limit = 8,
+): Promise<PostListItem[]> {
+  const search = normalizeSearchTerm(q);
+  if (!search) return [];
+
+  const pattern = `%${escapeLike(search.term)}%`;
+
+  return queryWithRetry(async () => {
+    const rows = await db
+      .select(listColumns)
+      .from(posts)
+      .where(
+        and(
+          eq(posts.published, true),
+          or(ilike(posts.title, pattern), ilike(posts.contentMd, pattern)) as SQL,
+        ),
+      )
+      .orderBy(
+        // 标题命中优先，再按时间倒序
+        desc(sql`${posts.title} ilike ${pattern}`),
+        desc(posts.createdAt),
+      )
+      .limit(limit);
+
+    return rows.map(toPostListItem);
+  });
+}
+
 /** 前台详情：只取已发布，草稿不可见 */
 export const getPublishedPostBySlug = cached(
   "published-post-by-slug",
@@ -388,6 +425,7 @@ export const getPublishedPostBySlug = cached(
       where: and(eq(posts.slug, slug), eq(posts.published, true)),
     })) ?? null,
 );
+
 
 export type PostSibling = {
   slug: string;
@@ -482,32 +520,43 @@ export const allPublishedPosts = cached("all-published", () =>
   db.select().from(posts).where(eq(posts.published, true)).orderBy(desc(posts.createdAt)),
 );
 
-/** 已发布文章用到的全部标签（去重，无计数） */
+/**
+ * 已发布文章用到的全部标签（去重，无计数）。
+ * 使用 unnest + GROUP BY 在 DB 侧聚合，只传标签字符串列表到应用层，
+ * 避免把全部文章的 tags 数组拉到 JS 再遍历。
+ */
 function queryAllTags() {
   return queryWithRetry(async () => {
-    const rows = await db.select({ tags: posts.tags }).from(posts).where(eq(posts.published, true));
-    const set = new Set<string>();
-    for (const row of rows) {
-      for (const tag of row.tags) set.add(tag);
-    }
-    return [...set];
+    const rows = await db.execute<{ tag: string }>(sql`
+      select distinct tag
+      from ${posts}, unnest(${posts.tags}) as tag
+      where ${posts.published}
+      order by tag
+    `);
+    return (rows as ReadonlyArray<{ tag: string }>).map((r) => r.tag);
   });
 }
 
 /** sitemap 用：全部标签 */
 export const allTags = cached("all-tags", queryAllTags);
 
-/** 标签云:从已发布文章聚合标签及数量 */
+/**
+ * 标签云：从已发布文章聚合标签及数量。
+ * 使用 unnest + GROUP BY 在 DB 侧计数，按数量倒序、同数量按拼音/字典序升序。
+ */
 function queryTagsWithCounts() {
   return queryWithRetry(async () => {
-    const rows = await db.select({ tags: posts.tags }).from(posts).where(eq(posts.published, true));
-    const counts = new Map<string, number>();
-    for (const row of rows) {
-      for (const tag of row.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
-    }
-    return [...counts.entries()]
-      .map(([tag, count]) => ({ tag, count }))
-      .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag, "zh-CN"));
+    const rows = await db.execute<{ tag: string; count: number }>(sql`
+      select tag, count(*)::int as count
+      from ${posts}, unnest(${posts.tags}) as tag
+      where ${posts.published}
+      group by tag
+      order by count desc, tag
+    `);
+    return (rows as ReadonlyArray<{ tag: string; count: number }>).map((r) => ({
+      tag: r.tag,
+      count: r.count,
+    }));
   });
 }
 
@@ -544,20 +593,37 @@ export function extractR2Key(urlOrPath: string): string | null {
 }
 
 /**
- * 后台媒体库反查：轻量扫描所有文章（含草稿），
- * 提取 coverImage 与 contentMd 中引用的图片 Key 并建立索引字典
+ * 后台媒体库反查：在 DB 侧用 regexp_matches 提取图片 URL 并建立索引字典。
+ *
+ * 与旧版（拉全量 contentMd 到应用层跑正则）相比：
+ * - 只传提取后的 URL 字符串，不再把整篇正文拉回应用层
+ * - 正则在 PostgreSQL 侧执行，文章量增大时吞吐量更稳定
+ *
+ * 注意：PostgreSQL regexp_matches 加 'g' flag 对每处匹配都返回一行，
+ * 用 LATERAL 展开后每行含一个捕获数组 m；m[1] 是 Markdown 图片 URL，
+ * m[2] 是 <img src> URL（两个捕获组互斥，取非空那个）。
  */
 export async function listMediaReferences(): Promise<Record<string, MediaReference[]>> {
   return queryWithRetry(async () => {
-    const rows = await db
-      .select({
-        id: posts.id,
-        title: posts.title,
-        slug: posts.slug,
-        coverImage: posts.coverImage,
-        contentMd: posts.contentMd,
-      })
-      .from(posts);
+    // 图片 URL 正则：捕获 Markdown ![alt](url) 和 <img src="url">
+    const IMG_REGEX =
+      "(?:!\\[.*?\\]\\((https?://[^\\s\\)\"'<>]+|/[^\\s\\)\"'<>]+\\.[a-zA-Z0-9]+)\\)|<img\\s[^>]*src=[\"']([^\"']+)[\"'])";
+
+    // 1) 从正文提取所有图片 URL（LATERAL + regexp_matches + 'g' flag）
+    const contentRows = await db.execute(sql`
+      select p.id, p.title, p.slug,
+             coalesce(m[1], m[2]) as url
+      from ${posts} p,
+        lateral regexp_matches(p.content_md, ${IMG_REGEX}, 'g') as m
+      where coalesce(m[1], m[2]) is not null
+        and coalesce(m[1], m[2]) != ''
+    `);
+
+    // 2) 封面图（直接取字段，无需正则）
+    const coverRows = await db
+      .select({ id: posts.id, title: posts.title, slug: posts.slug, coverImage: posts.coverImage })
+      .from(posts)
+      .where(sql`${posts.coverImage} is not null and ${posts.coverImage} != ''`);
 
     const refMap: Record<string, MediaReference[]> = {};
 
@@ -570,28 +636,26 @@ export async function listMediaReferences(): Promise<Record<string, MediaReferen
       }
     };
 
-    for (const post of rows) {
-      // 1. 封面图引用
-      if (post.coverImage) {
-        const key = extractR2Key(post.coverImage);
-        if (key) {
-          addRef(key, { id: post.id, title: post.title, slug: post.slug, isCover: true });
-        }
+    // 处理封面图
+    for (const row of coverRows) {
+      if (row.coverImage) {
+        const key = extractR2Key(row.coverImage);
+        if (key) addRef(key, { id: row.id, title: row.title, slug: row.slug, isCover: true });
       }
+    }
 
-      // 2. 正文插图引用（匹配 Markdown ![alt](url) 与 HTML <img src="url"> 等）
-      if (post.contentMd) {
-        const matches = post.contentMd.matchAll(
-          /(?:!\[.*?\]\((https?:\/\/[^\s\)\"\'<>]+|\/[^\s\)\"\'<>]+\.[a-zA-Z0-9]+)\)|<img\s+[^>]*src=["']([^"']+)["'])/g,
-        );
-        for (const match of matches) {
-          const rawUrl = match[1] || match[2];
-          if (rawUrl) {
-            const key = extractR2Key(rawUrl);
-            if (key) {
-              addRef(key, { id: post.id, title: post.title, slug: post.slug, isCover: false });
-            }
-          }
+    // 处理正文图片
+    for (const row of contentRows as ReadonlyArray<Record<string, unknown>>) {
+      const url = row.url as string | null;
+      if (url) {
+        const key = extractR2Key(url);
+        if (key) {
+          addRef(key, {
+            id: row.id as string,
+            title: row.title as string,
+            slug: row.slug as string,
+            isCover: false,
+          });
         }
       }
     }

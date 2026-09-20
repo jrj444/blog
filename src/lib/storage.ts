@@ -22,12 +22,26 @@ export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 /** 长缓存：文件名带 UUID，内容不可变，所以可以放心 immutable */
 export const CACHE_CONTROL = "public, max-age=31536000, immutable";
 
+// ---------- S3Client 懒初始化单例 ----------
+// 旧版 config() 每次调用都 new S3Client，当同一次请求内多个函数（如 createUploadTarget + deleteObject）
+// 串联调用时会重复创建实例。改为懒初始化：首次调用时检查环境变量并缓存实例，后续复用。
+
+type StorageConfig = {
+  bucket: string;
+  publicBaseUrl: string;
+  client: S3Client;
+};
+
+let _storageConfig: StorageConfig | null = null;
+
 /**
- * 注意：故意不在模块顶层校验环境变量、也不抛错。
- * `next build` 会求值这个模块，而 CI（.github/workflows/ci.yml）里没有 R2 变量，
- * 顶层抛错会直接把构建搞挂。所以惰性校验，只在真正调用时检查。
+ * 惰性获取存储配置（含 S3Client 单例）。
+ * 故意不在模块顶层校验环境变量：`next build` 在 CI 环境下没有 R2 变量，
+ * 顶层抛错会把构建搞挂。只在真正调用时检查。
  */
-function config() {
+function config(): StorageConfig {
+  if (_storageConfig) return _storageConfig;
+
   const accountId = process.env.R2_ACCOUNT_ID;
   const accessKeyId = process.env.R2_ACCESS_KEY_ID;
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
@@ -48,7 +62,7 @@ function config() {
     throw new Error(`缺少 R2 环境变量：${missing.join(", ")}`);
   }
 
-  return {
+  _storageConfig = {
     bucket: bucket!,
     publicBaseUrl: publicBaseUrl!.replace(/\/+$/, ""),
     client: new S3Client({
@@ -57,6 +71,8 @@ function config() {
       credentials: { accessKeyId: accessKeyId!, secretAccessKey: secretAccessKey! },
     }),
   };
+
+  return _storageConfig;
 }
 
 /** 类型守门：把任意字符串收窄成 AllowedImageType */
@@ -143,22 +159,46 @@ export type StoredMediaItemWithRefs = StoredMediaItem & {
   references: MediaReference[];
 };
 
+export type ListObjectsResult = {
+  items: StoredMediaItem[];
+  /** 下一页游标；null 表示已是最后一页 */
+  nextCursor: string | null;
+  /** 本次返回的条目总数 */
+  count: number;
+  /** 是否还有更多数据 */
+  hasMore: boolean;
+};
+
 /**
- * 列取存储桶中的对象（媒体库使用）
- * 按最后修改时间倒序排列
+ * 列取存储桶中的对象（媒体库使用），支持 ContinuationToken 分页。
+ *
+ * @param prefix  对象前缀过滤（可选）
+ * @param cursor  上一页返回的 nextCursor，传入则拉下一页（可选）
+ * @param pageSize 每页条数，默认 100，最大 1000
+ *
+ * 与旧版相比：
+ * - 不再硬编码 MaxKeys=500 无提示截断，改为分页
+ * - 返回 nextCursor / hasMore，调用方可自行决定是否继续加载
  */
-export async function listObjects(prefix?: string): Promise<StoredMediaItem[]> {
+export async function listObjects(
+  prefix?: string,
+  cursor?: string,
+  pageSize = 100,
+): Promise<ListObjectsResult> {
   try {
     const { client, bucket, publicBaseUrl } = config();
     const command = new ListObjectsV2Command({
       Bucket: bucket,
       Prefix: prefix || undefined,
-      MaxKeys: 500,
+      MaxKeys: Math.min(pageSize, 1000),
+      ContinuationToken: cursor || undefined,
     });
     const response = await client.send(command);
-    if (!response.Contents) return [];
+    if (!response.Contents) {
+      return { items: [], nextCursor: null, count: 0, hasMore: false };
+    }
 
-    return response.Contents.filter(
+    const items = response.Contents.filter(
       (item): item is typeof item & { Key: string } => typeof item.Key === "string",
     )
       .map((item) => ({
@@ -170,8 +210,13 @@ export async function listObjects(prefix?: string): Promise<StoredMediaItem[]> {
         publicUrl: `${publicBaseUrl}/${item.Key}`,
       }))
       .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
+
+    const hasMore = response.IsTruncated ?? false;
+    const nextCursor = hasMore ? (response.NextContinuationToken ?? null) : null;
+
+    return { items, nextCursor, count: items.length, hasMore };
   } catch (err) {
     console.error("[storage] listObjects error:", err);
-    return [];
+    return { items: [], nextCursor: null, count: 0, hasMore: false };
   }
 }

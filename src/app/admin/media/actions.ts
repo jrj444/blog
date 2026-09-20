@@ -34,7 +34,7 @@ export async function listMediaAction(prefix?: string): Promise<{
   }
 
   try {
-    const [items, refMap] = await Promise.all([listObjects(prefix), listMediaReferences()]);
+    const [{ items }, refMap] = await Promise.all([listObjects(prefix), listMediaReferences()]);
 
     const itemsWithRefs: StoredMediaItemWithRefs[] = items.map((item) => ({
       ...item,

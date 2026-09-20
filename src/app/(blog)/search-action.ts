@@ -1,6 +1,6 @@
 "use server";
 
-import { listPublishedPosts } from "@/lib/db/queries";
+import { searchPublishedPosts } from "@/lib/db/queries";
 import { formatDate } from "@/lib/format-date";
 
 export type SearchResultItem = {
@@ -14,9 +14,8 @@ export type SearchResultItem = {
 };
 
 /**
- * 前台全局即时搜索 Server Action：
- * 输入关键词，调用带 pg_trgm / ilike 模糊查询的 listPublishedPosts，
- * 仅检索已发布文章并返回最相关的至多 8 篇摘要信息。
+ * 前台全局即时搜索 Server Action。
+ * 调用不带缓存的 searchPublishedPosts，保证刚发布的文章立即可被搜索到。
  */
 export async function searchPublishedPostsAction(rawQuery: string): Promise<SearchResultItem[]> {
   const query = rawQuery.trim();
@@ -24,14 +23,9 @@ export async function searchPublishedPostsAction(rawQuery: string): Promise<Sear
     return [];
   }
 
-  // listPublishedPosts 内部会调用 normalizeSearchTerm 过滤无效字符并转义
-  const result = await listPublishedPosts({
-    page: 1,
-    pageSize: 8,
-    q: query,
-  });
+  const posts = await searchPublishedPosts(query, 8);
 
-  return result.posts.map((post) => ({
+  return posts.map((post) => ({
     id: post.id,
     slug: post.slug,
     title: post.title,
@@ -41,3 +35,4 @@ export async function searchPublishedPostsAction(rawQuery: string): Promise<Sear
     date: formatDate(post.createdAt),
   }));
 }
+

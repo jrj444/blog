@@ -69,12 +69,14 @@ pnpm dev                       # http://localhost:3000
 
 ## 常用脚本
 
-| 命令                                                    | 说明                                  |
-| ------------------------------------------------------- | ------------------------------------- |
-| `pnpm dev` / `pnpm build` / `pnpm start`                | 开发 / 构建 / 生产启动                |
-| `pnpm lint` / `pnpm typecheck` / `pnpm format:check`    | ESLint / TS / Prettier（CI 全部会跑） |
-| `pnpm format`                                           | 按 Prettier 格式化全仓库              |
-| `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:push` | Drizzle 迁移                          |
+| 命令                                                 | 说明                                  |
+| ---------------------------------------------------- | ------------------------------------- |
+| `pnpm dev` / `pnpm build` / `pnpm start`             | 开发 / 构建 / 生产启动                |
+| `pnpm lint` / `pnpm typecheck` / `pnpm format:check` | ESLint / TS / Prettier（CI 全部会跑） |
+| `pnpm format`                                        | 按 Prettier 格式化全仓库              |
+| `pnpm db:generate` / `pnpm db:migrate`               | Drizzle 迁移                          |
+
+> ⚠️ **不要使用 `drizzle-kit push`**：它会 introspect 真实数据库，把 RLS、策略、手写索引等「`schema.ts` 里没有」的对象当垃圾删掉（实测记录见 [`specs/spec-tag-management.md`](./specs/spec-tag-management.md) §13.6）。本项目的 schema 变更只走 `db:generate` + `db:migrate`。
 
 CI（`.github/workflows/ci.yml`）在 push / PR 时执行：format check → lint → typecheck → build。
 

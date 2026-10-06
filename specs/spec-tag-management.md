@@ -1013,18 +1013,18 @@ v1.5 已确认**不保留双写**；v1.6 澄清批次：**P0 + P1 + P3 合并为
 > **工作方式（v1.5 约定）**：按切片推进，每片 5–20 行代码 + **一次可运行的验证**；不留「写了一半」的代码。
 > **同步约定**：每完成一个切片，更新 §20.1 的状态与 §20.2 的记录（含日期）；spec 与实现分开提交。
 
-### 20.1 当前阶段：P0-① 归一化与 slug（进行中）
+### 20.1 当前阶段：P0 完成，下一阶段 P1（数据访问层与前台）
 
 | # | 切片 | 验证点（必须跑） | 状态 |
 | --- | --- | --- | --- |
 | 1 | 装 Vitest + 第一条最小测试 | `pnpm test` → `Tests 1 passed` | ✅ 2026-09-24 完成 |
-| 2 | `normalizeTagName` 的 NFKC / 全角空格断言（并把首条用例的尾部空白补回去） | `pnpm test` 绿；反向实验（去掉 `NFKC`）能变红 | 🟡 进行中 |
-| 3 | `normalizeTagKey` 的断言 | `pnpm test` 绿 → `src/lib/tags/normalize.ts` 完成 | ⬜ |
-| 4 | `slugifyTagName` 的断言 | `pnpm test` 绿 | ⬜ |
-| 5 | `withTagSlugSuffix`（含 60 截断） | `pnpm test` 绿 | ⬜ |
-| 6 | `buildTagSlug`（随机兜底 + 超长截断） | `pnpm test` 绿 | ⬜ |
-| 7 | `normalizeManualTagSlug`（两个抛错） | `pnpm test` 绿 → `src/lib/tags/slug.ts` 完成 | ⬜ |
-| 8 | `pnpm format` + `pnpm typecheck` + 提交 | 三绿 + 1 commit | ⬜ |
+| 2 | `normalizeTagName` 的 NFKC / 全角空格断言（并把首条用例的尾部空白补回去） | `pnpm test` 绿；反向实验（去掉 `NFKC`）能变红 | ✅ 2026-10-06 完成（反向实验已验证） |
+| 3 | `normalizeTagKey` 的断言 | `pnpm test` 绿 → `src/lib/tags/normalize.ts` 完成 | ✅ 2026-10-06 完成 |
+| 4 | `slugifyTagName` 的断言 | `pnpm test` 绿 | ✅ 2026-10-06 完成 |
+| 5 | `withTagSlugSuffix`（含 60 截断） | `pnpm test` 绿 | ✅ 2026-10-06 完成 |
+| 6 | `buildTagSlug`（随机兜底 + 超长截断） | `pnpm test` 绿 | ✅ 2026-10-06 完成 |
+| 7 | `normalizeManualTagSlug`（两个抛错） | `pnpm test` 绿 → `src/lib/tags/slug.ts` 完成 | ✅ 2026-10-06 完成 |
+| 8 | `pnpm format` + `pnpm typecheck` + 提交 | 三绿 + 1 commit | ✅ 2026-10-06 完成（`4223f3d`） |
 
 ### 20.2 已完成
 
@@ -1032,14 +1032,18 @@ v1.5 已确认**不保留双写**；v1.6 澄清批次：**P0 + P1 + P3 合并为
 - **2026-09-24** 工具链就绪：`vitest@5.0.1` 写入 devDependencies；`package.json` 增加 `test` / `test:watch`；新增 `.editorconfig` 与 `.vscode/settings.json`（2 空格缩进、保存即 Prettier 格式化）——从根上解决缩进漂移，比手动改格式更好。
 - **2026-09-24** 第 1 片完成：`src/lib/tags/normalize.ts` 首版（NFKC → trim → 空白折叠）+ `normalize.test.ts` 首条用例，`pnpm test` → `Tests 1 passed`；`src/lib/tags/` 通过 `prettier --check`。
 - **2026-10-06** spec v1.6 复核修订：澄清发布批次（切读 = P0+P1+P3，P2/P4 观察期后单独发布）、补录 `getDashboardStats` 的「今年」口径、§20.4 增补实现注意事项。
+- **2026-10-06** P0-① 完成并提交（`4223f3d`）：`normalizeTagKey` 与 `src/lib/tags/slug.ts`（`slugifyTagName` / `withTagSlugSuffix` / `buildTagSlug` / `normalizeManualTagSlug`），单测 21 条全绿；tsconfig 加 `allowImportingTsExtensions`（回填脚本的 `.ts` 相对导入需要）。
+- **2026-10-06** P0-②③ 完成并提交（`f6b1835`）：schema 加 `tags` / `post_tags` / `posts.published_at`；`pnpm db:generate` 生成 `drizzle/0001_wet_spyke.sql`（**只生成未执行**，§20.3 原约定）；rls.sql 加 RLS、`tags_public_read`（仅 `is_active = true` 可匿名读）、`post_tags` 无策略（不开放匿名直读）与 §14 的两个索引（`tags_active_idx` 按 §20.4 不建）。
+- **2026-10-06** P0-④ 完成并提交（`ab97d98`）：`scripts/backfill-tags.ts`——幂等回填（tags 按 `normalized_key` 复用、`post_tags` on conflict 跳过、`published_at` 只补空值并跑 §13.2 自查），复用 `src/lib/tags` 纯函数模块；typecheck 绿，Node 直跑冒烟通过（迁移未执行时对库干净失败回滚，证明加载/连接/事务路径可用）；**真实回填待迁移执行后**（见 §20.3 runbook）。
+- **2026-10-06** P0-⑤ 完成并提交（`7d71e8d`）：validator 改收 `PostTagInput[]` 并新增 `publishedAt`；`parseForm` 支持新 JSON 隐藏字段 + 旧逗号分支（§8.2 过渡期，P5 删）；`createPost`/`updatePost` 首次引入事务——先读旧关联再 diff 写 `post_tags`（保留 `created_at` 语义），发布留空填 `now()`，不再写 `posts.tags`；停用标签按 §8.2 规则 2/3 拒绝或保留；并发用不带 target 的 `on conflict do nothing` + 回查（§20.4）。验证：`pnpm test`（21 绿）+ typecheck + lint + build 全绿。**本地联调写路径前需先 `db:migrate` + 回填**。
 
-### 20.3 待办（P0 其余，按顺序推进）
+### 20.3 待办（P1 起，按 §16 阶段推进）
 
-- **P0-②** `src/lib/db/schema.ts`：`tags` / `post_tags` / `posts.published_at` → `pnpm db:generate`（**只生成迁移文件，先不执行**）。
-- **P0-③** `supabase/rls.sql`：`tags` / `post_tags` 的 RLS、策略与索引。
-- **P0-④** `scripts/backfill-tags.ts`：回填 + §13.2 的自查 SQL。
-- **P0-⑤** 写路径：`createPost` / `updatePost` 的事务 + 去重 + 并发（§8.2 规则 4、7）。
-- P1 及以后见 §16 的阶段表。
+- **P1** 数据访问层与前台改造：§11 的 API 形状 + §11.1 波及清单逐项处理（含 v1.6 补录的 `getDashboardStats` 口径）；完成标准是 §11.1 末尾的机检断言只剩白名单（`schema.ts` 列定义与 `scripts/backfill-tags.ts`）。
+- **P3** 编辑器标签选择组件（§8.1 交互契约：下拉 + 手输创建 + 键盘操作）+「发布时间」`datetime-local` 字段（§5.3、§16）。
+- **P2 / P4**（后台标签管理 + 统计趋势）在切读观察期后发布，不与切读同批（§17.1）。
+- **P5** 删除 `posts.tags` 列与 `rls.sql:29` 的 `posts_tags_gin` 行、删除逗号兼容分支、文档同步。
+- **切读发布 runbook（P0+P1+P3 一次发布，§17.1）**：备份（Supabase/pg_dump）→ `pnpm db:migrate`（0001）→ 执行 `supabase/rls.sql`（新增段）→ `node scripts/backfill-tags.ts`（幂等，跑两次核对对账输出）→ 发布代码 → 验证 `posts.tags` 已冻结不再被写入、§15.1/§15.2 验收项。
 
 ### 20.4 实施约定
 

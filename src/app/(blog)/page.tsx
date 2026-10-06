@@ -1,4 +1,4 @@
-import { listPublishedPosts, getPublishedStats } from "@/lib/db/queries";
+import { listPublishedPosts, getPublishedStats, listPublicTagsWithCounts } from "@/lib/db/queries";
 import { HomeFeed } from "@/components/blog/home-feed";
 import { Reveal } from "@/components/blog/reveal";
 
@@ -6,6 +6,8 @@ import { Reveal } from "@/components/blog/reveal";
 export const dynamic = "force-dynamic";
 
 const HOME_POST_COUNT = 8;
+/** 首页标签 chips 上限：按已发布文章数排序取前 N 个（来源：listPublicTagsWithCounts，§11.1） */
+const HOME_TAG_COUNT = 12;
 
 function Stat({ n, l }: { n: number | string; l: string }) {
   return (
@@ -27,9 +29,10 @@ function formatMonthDay(iso: string | null) {
 }
 
 export default async function HomePage() {
-  const [{ posts, hasMore }, stats] = await Promise.all([
+  const [{ posts, hasMore }, stats, tags] = await Promise.all([
     listPublishedPosts({ page: 1, pageSize: HOME_POST_COUNT }),
     getPublishedStats(),
+    listPublicTagsWithCounts(),
   ]);
 
   const updatedLabel = formatMonthDay(stats.lastUpdated);
@@ -59,7 +62,7 @@ export default async function HomePage() {
       </section>
 
       <section className="mt-16">
-        <HomeFeed posts={posts} hasMore={hasMore} />
+        <HomeFeed posts={posts} hasMore={hasMore} tags={tags.slice(0, HOME_TAG_COUNT)} />
       </section>
     </div>
   );

@@ -1,12 +1,12 @@
 import type { MetadataRoute } from "next";
-import { allPublishedPosts, allTags } from "@/lib/db/queries";
+import { allPublishedPosts, listPublicTagsWithCounts } from "@/lib/db/queries";
 import { absUrl } from "@/lib/site";
 import { toDate } from "@/lib/format-date";
 
 export const dynamic = "force-dynamic";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [posts, tags] = await Promise.all([allPublishedPosts(), allTags()]);
+  const [posts, tags] = await Promise.all([allPublishedPosts(), listPublicTagsWithCounts()]);
 
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: absUrl("/"), changeFrequency: "daily", priority: 1 },
@@ -22,8 +22,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.7,
   }));
 
+  // sitemap 只输出公开（is_active = true）且至少关联一篇已发布文章的标签（§9），URL 用 slug
   const tagRoutes: MetadataRoute.Sitemap = tags.map((tag) => ({
-    url: absUrl(`/tags/${encodeURIComponent(tag)}`),
+    url: absUrl(`/tags/${encodeURIComponent(tag.slug)}`),
     changeFrequency: "weekly",
     priority: 0.4,
   }));

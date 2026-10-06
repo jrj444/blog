@@ -150,7 +150,7 @@ export default async function Image({ params }: Props) {
         >
           {tags.slice(0, 4).map((tag) => (
             <div
-              key={tag}
+              key={tag.id}
               style={{
                 padding: "6px 14px",
                 borderRadius: "9999px",
@@ -161,7 +161,7 @@ export default async function Image({ params }: Props) {
                 fontWeight: 500,
               }}
             >
-              #{tag}
+              #{tag.name}
             </div>
           ))}
         </div>

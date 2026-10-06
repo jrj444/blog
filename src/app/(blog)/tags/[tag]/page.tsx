@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Feather } from "lucide-react";
 import type { Metadata } from "next";
-import { listPublishedPosts } from "@/lib/db/queries";
+import { notFound, permanentRedirect } from "next/navigation";
+import { listPublishedPosts, resolvePublicTag } from "@/lib/db/queries";
 import { PostCard } from "@/components/blog/post-card";
 import { Pagination } from "@/components/blog/pagination";
 
@@ -16,24 +17,47 @@ type Props = {
 };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { tag } = await params;
+  const { tag: routeValue } = await params;
+  const resolved = await resolvePublicTag(routeValue);
+
+  // 停用或不存在（§6.3）：metadata 退化为占位，页面本体 404
+  if (!resolved || !resolved.isActive) {
+    return { title: "标签不存在" };
+  }
+
   return {
-    title: `#${tag}`,
-    description: `标签「${tag}」下的全部文章。`,
+    title: `#${resolved.name}`,
+    // metadata 优先使用标签名称和描述（§9）
+    description: resolved.description ?? `标签「${resolved.name}」下的全部文章。`,
   };
 }
 
 export default async function TagPage({ params, searchParams }: Props) {
-  const { tag } = await params;
+  const { tag: routeValue } = await params;
   const { page: pageParam } = await searchParams;
   const raw = Array.isArray(pageParam) ? pageParam[0] : pageParam;
   const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
   const page = Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
 
-  const { posts, total, hasMore } = await listPublishedPosts({ page, pageSize: PAGE_SIZE, tag });
+  // §6.3 解析：slug 大小写不敏感 → 名称归一化回退；停用或不存在返回 404
+  const resolved = await resolvePublicTag(routeValue);
+  if (!resolved || !resolved.isActive) {
+    notFound();
+  }
+
+  // 最终地址与当前 URL 不同 → 永久重定向到 canonical slug（§6.3）
+  if (routeValue.toLowerCase() !== resolved.slug) {
+    permanentRedirect(`/tags/${encodeURIComponent(resolved.slug)}`);
+  }
+
+  const { posts, total, hasMore } = await listPublishedPosts({
+    page,
+    pageSize: PAGE_SIZE,
+    tagId: resolved.id,
+  });
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const tagPath = `/tags/${encodeURIComponent(tag)}`;
+  const tagPath = `/tags/${encodeURIComponent(resolved.slug)}`;
   const buildPageHref = (p: number) => (p > 1 ? `${tagPath}?page=${p}` : tagPath);
 
   return (
@@ -42,7 +66,7 @@ export default async function TagPage({ params, searchParams }: Props) {
         <p className="text-xs font-semibold tracking-[0.2em] text-muted-foreground uppercase">
           标签
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight break-words">#{tag}</h1>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight break-words">#{resolved.name}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {total > 0 ? `共 ${total} 篇文章` : "该标签下还没有文章"}
         </p>

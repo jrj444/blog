@@ -1,8 +1,9 @@
 import Link from "next/link";
+import type { TagSummary } from "@/lib/db/queries";
 import { cn } from "@/lib/utils";
 
 type TagBadgeProps = {
-  tag: string;
+  tag: TagSummary;
   className?: string;
   /** 在 <a>/<Link> 内部使用时传入，渲染为 <span>，避免 <a> 嵌套 <a> 触发 hydration 错误 */
   asSpan?: boolean;
@@ -17,12 +18,12 @@ export function TagBadge({ tag, className, asSpan = false }: TagBadgeProps) {
   );
 
   if (asSpan) {
-    return <span className={classes}>#{tag}</span>;
+    return <span className={classes}>#{tag.name}</span>;
   }
 
   return (
-    <Link href={`/tags/${encodeURIComponent(tag)}`} className={classes}>
-      #{tag}
+    <Link href={`/tags/${encodeURIComponent(tag.slug)}`} className={classes}>
+      #{tag.name}
     </Link>
   );
 }

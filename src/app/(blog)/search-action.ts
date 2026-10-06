@@ -1,6 +1,6 @@
 "use server";
 
-import { searchPublishedPosts } from "@/lib/db/queries";
+import { searchPublishedPosts, type TagSummary } from "@/lib/db/queries";
 import { formatDate } from "@/lib/format-date";
 
 export type SearchResultItem = {
@@ -8,7 +8,7 @@ export type SearchResultItem = {
   slug: string;
   title: string;
   excerpt: string | null;
-  tags: string[];
+  tags: TagSummary[];
   readingMinutes: number;
   date: string;
 };
@@ -35,4 +35,3 @@ export async function searchPublishedPostsAction(rawQuery: string): Promise<Sear
     date: formatDate(post.createdAt),
   }));
 }
-

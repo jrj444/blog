@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { db, queryWithRetry } from "@/lib/db";
-import { postTags, posts, tags } from "@/lib/db/schema";
+import { postTags, posts, tags, type Post } from "@/lib/db/schema";
 import {
   count,
   eq,
@@ -8,7 +8,6 @@ import {
   and,
   or,
   ilike,
-  arrayContains,
   inArray,
   desc,
   asc,
@@ -24,6 +23,17 @@ import { escapeLike, normalizeSearchTerm } from "@/lib/db/search";
 
 // ---------- 列表投影 ----------
 
+/**
+ * 列表页的标签投影：join post_tags + tags 聚合成 TagSummary[]（§11.1）。
+ * 只含启用标签——前台徽章/标签云/keywords 都不出现停用标签（§7.5）。
+ */
+const activeTagsPerPost = sql<TagSummary[]>`coalesce((
+  select json_agg(json_build_object('id', t.id, 'name', t.name, 'slug', t.slug) order by pt.position)
+  from ${postTags} pt
+  join ${tags} t on t.id = pt.tag_id
+  where pt.post_id = ${posts.id} and t.is_active
+), '[]'::json)`;
+
 /** 列表页只需要这些列：正文 content_md 不参与列表渲染（否则每次列表都要搬运全文）。 */
 const listColumns = {
   id: posts.id,
@@ -31,7 +41,7 @@ const listColumns = {
   title: posts.title,
   excerpt: posts.excerpt,
   coverImage: posts.coverImage,
-  tags: posts.tags,
+  tags: activeTagsPerPost,
   published: posts.published,
   views: posts.views,
   createdAt: posts.createdAt,
@@ -46,7 +56,7 @@ type PostListRow = {
   title: string;
   excerpt: string | null;
   coverImage: string | null;
-  tags: string[];
+  tags: TagSummary[];
   published: boolean;
   views: number;
   createdAt: Date;
@@ -62,6 +72,29 @@ export type PostListItem = PostListRow & {
   /** 预估阅读时长（分钟），由 charCount 推导，规则与 lib/reading-time.ts 一致 */
   readingMinutes: number;
 };
+
+// ---------- 标签类型（§11） ----------
+
+export type TagSummary = {
+  id: string;
+  name: string;
+  slug: string;
+};
+
+/** 后台候选/回显用：带启用状态（含停用标签） */
+export type TagOption = TagSummary & { isActive: boolean };
+
+/** /tags/[slug] 路由参数解析结果（§6.3） */
+export type ResolvedTag = TagSummary & { description: string | null; isActive: boolean };
+
+/** 前台标签页 / sitemap / 首页 chips：公开标签 + 已发布文章数 */
+export type TagSummaryWithCount = TagSummary & { description: string | null; count: number };
+
+/** 文章详情（前台）：tags 只含启用标签 */
+export type PostDetail = Omit<Post, "tags"> & { tags: TagSummary[] };
+
+/** 文章详情（后台编辑）：tags 含停用标签，供编辑器回显（§8.2 规则 2） */
+export type PostDetailAdmin = Omit<Post, "tags"> & { tags: TagOption[] };
 
 const MINUTES_PER_CHAR = 350;
 
@@ -180,8 +213,35 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
       db.select({ value: count() }).from(posts).where(where),
     ]);
 
+    // 标签改走关系表批量取（含停用，后台可标注）；旧数组列已冻结不再读取（§13.3）
+    const postIds = rows.map((row) => row.id);
+    const tagsByPost = new Map<string, TagOption[]>();
+    if (postIds.length > 0) {
+      const tagRows = await db
+        .select({
+          postId: postTags.postId,
+          id: tags.id,
+          name: tags.name,
+          slug: tags.slug,
+          isActive: tags.isActive,
+        })
+        .from(postTags)
+        .innerJoin(tags, eq(tags.id, postTags.tagId))
+        .where(inArray(postTags.postId, postIds))
+        .orderBy(postTags.position);
+      for (const { postId, ...tag } of tagRows) {
+        const list = tagsByPost.get(postId) ?? [];
+        list.push(tag);
+        tagsByPost.set(postId, list);
+      }
+    }
+
     return {
-      posts: rows,
+      posts: rows.map((row) => ({
+        ...row,
+        // 展开覆盖：冻结的旧数组列值与新类型一并替换为关系表数据
+        tags: tagsByPost.get(row.id) ?? [],
+      })),
       total,
       counts,
       page,
@@ -191,9 +251,19 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
   });
 }
 
-// 后台编辑页：按 id 取（含草稿）
-export function getPostById(id: string) {
-  return queryWithRetry(() => db.query.posts.findFirst({ where: eq(posts.id, id) }));
+// 后台编辑页：按 id 取（含草稿）。标签改从关系表取（含停用标签，供编辑器回显 §8.2 规则 2）
+export async function getPostById(id: string): Promise<PostDetailAdmin | undefined> {
+  return queryWithRetry(async () => {
+    const post = await db.query.posts.findFirst({ where: eq(posts.id, id) });
+    if (!post) return undefined;
+    const tagRows = await db
+      .select({ id: tags.id, name: tags.name, slug: tags.slug, isActive: tags.isActive })
+      .from(postTags)
+      .innerJoin(tags, eq(tags.id, postTags.tagId))
+      .where(eq(postTags.postId, post.id))
+      .orderBy(postTags.position);
+    return { ...post, tags: tagRows };
+  });
 }
 
 // 后台仪表盘：最近更新的文章（含草稿），按更新时间倒序
@@ -223,7 +293,8 @@ export async function getDashboardStats() {
         count(*) filter (where not ${posts.published})::int as drafts,
         count(*) filter (
           where ${posts.published}
-            and extract(year from ${posts.createdAt}) = extract(year from now())
+            and ${posts.publishedAt} is not null
+            and extract(year from ${posts.publishedAt}) = extract(year from now())
         )::int as this_year,
         coalesce(sum(${posts.views}), 0)::int as views
       from ${posts}
@@ -414,7 +485,7 @@ export async function createPost(input: PostInput) {
         contentMd: input.contentMd,
         published: input.published,
         coverImage: input.coverImage || null,
-        // §5.3：发布时留空由服务端填 now()，草稿留 NULL；posts.tags 数组列不再写入（硬切，§13.3）
+        // §5.3：发布时留空由服务端填 now()，草稿留 NULL；旧标签数组列不再写入（硬切，§13.3）
         publishedAt: input.published
           ? (input.publishedAt ?? new Date())
           : (input.publishedAt ?? null),
@@ -481,7 +552,8 @@ export async function incrementViews(postId: string) {
 export type ListPublishedParams = {
   page?: number;
   pageSize?: number;
-  tag?: string;
+  /** 已解析的标签 id（§6.3 由 resolvePublicTag 得到）；按 tag_id 过滤不再按名称匹配数组列 */
+  tagId?: string;
   q?: string;
 };
 
@@ -496,7 +568,7 @@ export type PublishedPostsResult = {
 type PublishedPostsArgs = {
   page: number;
   pageSize: number;
-  tag: string | null;
+  tagId: string | null;
   /** 归一化后的搜索词（原文，未转义）；null 表示不搜索 */
   term: string | null;
 };
@@ -508,28 +580,31 @@ type PublishedPostsArgs = {
 export function listPublishedPosts({
   page = 1,
   pageSize = 10,
-  tag,
+  tagId,
   q,
 }: ListPublishedParams = {}): Promise<PublishedPostsResult> {
   const search = normalizeSearchTerm(q);
   return cachedListPublishedPosts({
     page,
     pageSize,
-    tag: tag?.trim() || null,
+    tagId: tagId?.trim() || null,
     term: search?.term ?? null,
   });
 }
 
 async function queryListPublishedPosts(args: PublishedPostsArgs): Promise<PublishedPostsResult> {
-  const { page, pageSize, tag, term } = args;
+  const { page, pageSize, tagId, term } = args;
   const offset = (page - 1) * pageSize;
 
   // 转义后的 LIKE 模式：escapeLike 处理 `%` `_` `\`，避免用户输入 `%` 命中全表
   const pattern = term ? `%${escapeLike(term)}%` : null;
 
   const conditions: SQL[] = [eq(posts.published, true)];
-  if (tag) {
-    conditions.push(arrayContains(posts.tags, [tag]));
+  if (tagId) {
+    // 按关系表过滤（§11.1）：不再 arrayContains 数组列
+    conditions.push(
+      sql`exists (select 1 from ${postTags} where ${postTags.postId} = ${posts.id} and ${postTags.tagId} = ${tagId})`,
+    );
   }
   if (pattern) {
     conditions.push(or(ilike(posts.title, pattern), ilike(posts.contentMd, pattern)) as SQL);
@@ -595,13 +670,25 @@ export async function searchPublishedPosts(q: string, limit = 8): Promise<PostLi
   });
 }
 
-/** 前台详情：只取已发布，草稿不可见 */
+/**
+ * 前台详情：只取已发布，草稿不可见。
+ * 标签改从关系表取：只含启用标签（前台徽章/keywords 不输出停用标签，§7.5/§9）。
+ */
 export const getPublishedPostBySlug = cached(
   "published-post-by-slug",
-  async (slug: string) =>
-    (await db.query.posts.findFirst({
+  async (slug: string): Promise<PostDetail | null> => {
+    const post = await db.query.posts.findFirst({
       where: and(eq(posts.slug, slug), eq(posts.published, true)),
-    })) ?? null,
+    });
+    if (!post) return null;
+    const tagRows = await db
+      .select({ id: tags.id, name: tags.name, slug: tags.slug })
+      .from(postTags)
+      .innerJoin(tags, eq(tags.id, postTags.tagId))
+      .where(and(eq(postTags.postId, post.id), eq(tags.isActive, true)))
+      .orderBy(postTags.position);
+    return { ...post, tags: tagRows };
+  },
 );
 
 export type PostSibling = {
@@ -675,7 +762,8 @@ export const getPublishedStats = cached("published-stats", async () => {
     select
       count(*)::int as total,
       count(*) filter (
-        where extract(year from ${posts.createdAt}) = extract(year from now())
+        where ${posts.publishedAt} is not null
+          and extract(year from ${posts.publishedAt}) = extract(year from now())
       )::int as this_year,
       max(${posts.updatedAt}) as last_updated
     from ${posts}
@@ -698,50 +786,77 @@ export const allPublishedPosts = cached("all-published", () =>
 );
 
 /**
- * 已发布文章用到的全部标签（去重，无计数）。
- * 使用 unnest + GROUP BY 在 DB 侧聚合，只传标签字符串列表到应用层，
- * 避免把全部文章的 tags 数组拉到 JS 再遍历。
+ * 公开标签及已发布文章数（§9）：只含启用标签，count = 关联的已发布文章数，
+ * 按文章数倒序、名称升序。前台标签页 / sitemap / 首页 chips / 后台仪表盘共用。
  */
-function queryAllTags() {
+function queryPublicTagsWithCounts(): Promise<TagSummaryWithCount[]> {
   return queryWithRetry(async () => {
-    const rows = await db.execute<{ tag: string }>(sql`
-      select distinct tag
-      from ${posts}, unnest(${posts.tags}) as tag
-      where ${posts.published}
-      order by tag
+    const rows = await db.execute(sql`
+      select t.id, t.name, t.slug, t.description, count(p.id)::int as count
+      from ${tags} t
+      join ${postTags} pt on pt.tag_id = t.id
+      join ${posts} p on p.id = pt.post_id and p.published = true
+      where t.is_active
+      group by t.id, t.name, t.slug, t.description
+      order by count desc, t.name
     `);
-    return (rows as ReadonlyArray<{ tag: string }>).map((r) => r.tag);
-  });
-}
-
-/** sitemap 用：全部标签 */
-export const allTags = cached("all-tags", queryAllTags);
-
-/**
- * 标签云：从已发布文章聚合标签及数量。
- * 使用 unnest + GROUP BY 在 DB 侧计数，按数量倒序、同数量按拼音/字典序升序。
- */
-function queryTagsWithCounts() {
-  return queryWithRetry(async () => {
-    const rows = await db.execute<{ tag: string; count: number }>(sql`
-      select tag, count(*)::int as count
-      from ${posts}, unnest(${posts.tags}) as tag
-      where ${posts.published}
-      group by tag
-      order by count desc, tag
-    `);
-    return (rows as ReadonlyArray<{ tag: string; count: number }>).map((r) => ({
-      tag: r.tag,
-      count: r.count,
+    return (
+      rows as unknown as ReadonlyArray<{
+        id: string;
+        name: string;
+        slug: string;
+        description: string | null;
+        count: number;
+      }>
+    ).map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      description: row.description,
+      count: row.count,
     }));
   });
 }
 
-/** 前台标签页用（缓存） */
-export const listTagsWithCounts = cached("tags-with-counts", queryTagsWithCounts);
+/** 前台标签页 / sitemap / 首页 chips 用（缓存） */
+export const listPublicTagsWithCounts = cached(
+  "public-tags-with-counts",
+  queryPublicTagsWithCounts,
+);
 
 /** 后台仪表盘用（不缓存，管理员需要看到刚发布的数据） */
-export const listTagsWithCountsUncached = queryTagsWithCounts;
+export const listPublicTagsWithCountsUncached = queryPublicTagsWithCounts;
+
+/**
+ * 解析 /tags/[slug] 的路由参数（§6.3）：
+ * 1. 入参 toLowerCase() 后精确匹配 tags.slug——slug 全小写存储；不要用 lower(tags.slug)
+ *    比较，那会绕开唯一索引；
+ * 2. 未命中时把 URL 参数按标签名称归一化，匹配 normalized_key（兼容迁移前的名称型旧
+ *    URL，只回退一次、不追历史链）；
+ * 3. 后续动作由页面决定：停用或不存在 → 404；最终地址与当前 URL 不同 → permanentRedirect。
+ */
+export const resolvePublicTag = cached(
+  "resolve-public-tag",
+  async (routeValue: string): Promise<ResolvedTag | null> => {
+    const columns = {
+      id: tags.id,
+      name: tags.name,
+      slug: tags.slug,
+      description: tags.description,
+      isActive: tags.isActive,
+    };
+    const [bySlug] = await db
+      .select(columns)
+      .from(tags)
+      .where(eq(tags.slug, routeValue.toLowerCase()))
+      .limit(1);
+    if (bySlug) return bySlug;
+    const key = normalizeTagKey(routeValue);
+    if (!key) return null;
+    const [byKey] = await db.select(columns).from(tags).where(eq(tags.normalizedKey, key)).limit(1);
+    return byKey ?? null;
+  },
+);
 
 // ---------- 媒体库反向引用扫描 ----------
 

@@ -85,7 +85,8 @@ export default async function PostPage({ params }: Props) {
       name: siteConfig.name,
       url: siteConfig.url,
     },
-    ...(post.tags.length > 0 ? { keywords: post.tags.join(", ") } : {}),
+    // JSON-LD keywords 用标签名称；查询已过滤停用标签（§9）
+    ...(post.tags.length > 0 ? { keywords: post.tags.map((item) => item.name).join(", ") } : {}),
   };
 
   return (
@@ -118,7 +119,7 @@ export default async function PostPage({ params }: Props) {
             {post.tags.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {post.tags.map((tag) => (
-                  <TagBadge key={tag} tag={tag} />
+                  <TagBadge key={tag.id} tag={tag} />
                 ))}
               </div>
             )}

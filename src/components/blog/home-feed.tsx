@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Feather } from "lucide-react";
-import type { PostListItem } from "@/lib/db/queries";
+import type { PostListItem, TagSummaryWithCount } from "@/lib/db/queries";
 import { cn } from "@/lib/utils";
 import { PostCard } from "./post-card";
 
@@ -12,12 +12,14 @@ const chip = (active: boolean) =>
       : "border-border text-muted-foreground hover:border-primary/40 hover:text-primary",
   );
 
-export function HomeFeed({ posts, hasMore }: { posts: PostListItem[]; hasMore: boolean }) {
-  // 从当前页文章提取标签集合（用于展示快捷跳转入口）
-  const allTags = [...new Set(posts.flatMap((p) => p.tags))].sort((a, b) =>
-    a.localeCompare(b, "zh-CN"),
-  );
+type HomeFeedProps = {
+  posts: PostListItem[];
+  hasMore: boolean;
+  /** 标签 chips 来源改为独立查询（§11.1）：公开标签按已发布文章数排序，不再依赖当前页文章 */
+  tags: TagSummaryWithCount[];
+};
 
+export function HomeFeed({ posts, hasMore, tags }: HomeFeedProps) {
   return (
     <section>
       <div className="flex items-baseline justify-between gap-4">
@@ -32,16 +34,20 @@ export function HomeFeed({ posts, hasMore }: { posts: PostListItem[]; hasMore: b
         )}
       </div>
 
-      {allTags.length > 0 && (
+      {tags.length > 0 && (
         <div className="mt-5 flex flex-wrap gap-2">
           {/* All 按钮：链接到首页本身（无 tag 筛选） */}
           <Link href="/" className={chip(false)}>
             All
           </Link>
-          {allTags.map((tag) => (
+          {tags.map((tag) => (
             // 点击标签跳转到全量标签页，避免只过滤当前页的 N 篇
-            <Link key={tag} href={`/tags/${encodeURIComponent(tag)}`} className={chip(false)}>
-              #{tag}
+            <Link
+              key={tag.id}
+              href={`/tags/${encodeURIComponent(tag.slug)}`}
+              className={chip(false)}
+            >
+              #{tag.name}
             </Link>
           ))}
         </div>
@@ -61,4 +67,3 @@ export function HomeFeed({ posts, hasMore }: { posts: PostListItem[]; hasMore: b
     </section>
   );
 }
-

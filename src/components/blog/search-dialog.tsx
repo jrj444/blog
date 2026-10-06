@@ -268,10 +268,10 @@ function SearchModal({ onClose }: { onClose: () => void }) {
                             <div className="flex items-center gap-1">
                               {item.tags.slice(0, 3).map((tag) => (
                                 <span
-                                  key={tag}
+                                  key={tag.id}
                                   className="rounded border border-border/60 bg-background/80 px-1 py-0.5 text-[10px]"
                                 >
-                                  #{tag}
+                                  #{tag.name}
                                 </span>
                               ))}
                             </div>

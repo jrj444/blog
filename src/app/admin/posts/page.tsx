@@ -188,7 +188,9 @@ export default async function AdminPostsPage({
                       {post.tags.length > 0 && (
                         <span className="mt-1 flex flex-wrap gap-1 font-mono text-[10.5px] text-muted-foreground">
                           {post.tags.slice(0, 3).map((t) => (
-                            <span key={t}>#{t}</span>
+                            <span key={t.id} title={t.isActive ? undefined : "已停用"}>
+                              #{t.name}
+                            </span>
                           ))}
                           {post.tags.length > 3 && <span>+{post.tags.length - 3}</span>}
                         </span>

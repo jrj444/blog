@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Feather } from "lucide-react";
 import type { Metadata } from "next";
-import { listTagsWithCounts } from "@/lib/db/queries";
+import { listPublicTagsWithCounts } from "@/lib/db/queries";
 import { cn } from "@/lib/utils";
 
 // 页面数据来自数据库,每次请求实时渲染(构建期不访问数据库)。
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function TagsPage() {
-  const tags = await listTagsWithCounts();
+  const tags = await listPublicTagsWithCounts();
   const maxCount = Math.max(1, ...tags.map((t) => t.count));
 
   return (
@@ -30,19 +30,22 @@ export default async function TagsPage() {
 
       {tags.length > 0 ? (
         <div className="mt-8 flex flex-wrap gap-2.5">
-          {tags.map(({ tag, count }) => {
-            const big = count >= maxCount;
+          {tags.map((tag) => {
+            const big = tag.count >= maxCount;
             return (
               <Link
-                key={tag}
-                href={`/tags/${encodeURIComponent(tag)}`}
+                key={tag.id}
+                href={`/tags/${encodeURIComponent(tag.slug)}`}
+                title={tag.description ?? undefined}
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full border border-border text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary",
                   big ? "px-5 py-2 text-base" : "px-3.5 py-1.5 text-sm",
                 )}
               >
-                <span>#{tag}</span>
-                <i className="font-mono text-[10.5px] text-muted-foreground not-italic">{count}</i>
+                <span>#{tag.name}</span>
+                <i className="font-mono text-[10.5px] text-muted-foreground not-italic">
+                  {tag.count}
+                </i>
               </Link>
             );
           })}

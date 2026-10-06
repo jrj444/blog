@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { Download, Copy, Check, X, Sparkles, Loader2 } from "lucide-react";
+import type { TagSummary } from "@/lib/db/queries";
 
 export type SharePosterData = {
   title: string;
   slug: string;
   excerpt: string | null;
-  tags: string[];
+  tags: TagSummary[];
   date: string;
   readingMinutes: number;
   url: string;
@@ -176,7 +177,7 @@ function SharePosterContent({ post, onClose }: { post: SharePosterData; onClose:
         let tagX = 96;
         ctx.font = "500 18px -apple-system, BlinkMacSystemFont, sans-serif";
         for (const tag of post.tags.slice(0, 4)) {
-          const tagText = `#${tag}`;
+          const tagText = `#${tag.name}`;
           const tagWidth = ctx.measureText(tagText).width + 30;
 
           ctx.fillStyle = "rgba(255, 255, 255, 0.08)";

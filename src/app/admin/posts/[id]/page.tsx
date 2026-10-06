@@ -27,7 +27,9 @@ export default async function EditPostPage({ params }: { params: Promise<{ id: s
           excerpt: post.excerpt ?? "",
           contentMd: post.contentMd,
           coverImage: post.coverImage ?? "",
-          tags: post.tags,
+          // 过渡期（§8.2）：编辑器还是逗号输入框，回显为名称数组（含停用标签，提交后
+          // 由服务端按 normalized_key 解析回既有关联）；P3 换标签选择组件时移除
+          tags: post.tags.map((t) => t.name),
           published: post.published,
         }}
       />

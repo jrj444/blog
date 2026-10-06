@@ -4,7 +4,7 @@ import {
   getDashboardStats,
   listRecentPosts,
   listTopViewedPosts,
-  listTagsWithCountsUncached,
+  listPublicTagsWithCountsUncached,
 } from "@/lib/db/queries";
 import { formatDate } from "@/lib/format-date";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
@@ -17,7 +17,7 @@ export default async function AdminDashboardPage() {
     getDashboardStats(),
     listRecentPosts(5),
     listTopViewedPosts(5),
-    listTagsWithCountsUncached(),
+    listPublicTagsWithCountsUncached(),
   ]);
 
   const cards = [
@@ -233,15 +233,15 @@ export default async function AdminDashboardPage() {
             {tags.length === 0 ? (
               <p className="text-sm text-muted-foreground">暂无标签。</p>
             ) : (
-              tags.map(({ tag, count }) => (
+              tags.map((tag) => (
                 <Link
-                  key={tag}
-                  href={"/tags/" + encodeURIComponent(tag)}
+                  key={tag.id}
+                  href={"/tags/" + encodeURIComponent(tag.slug)}
                   className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/35 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
                 >
-                  <span>#{tag}</span>
+                  <span>#{tag.name}</span>
                   <span className="rounded-full bg-background px-1.5 text-[10px] tabular-nums">
-                    {count}
+                    {tag.count}
                   </span>
                 </Link>
               ))

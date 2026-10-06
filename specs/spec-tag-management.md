@@ -1013,7 +1013,7 @@ v1.5 已确认**不保留双写**；v1.6 澄清批次：**P0 + P1 + P3 合并为
 > **工作方式（v1.5 约定）**：按切片推进，每片 5–20 行代码 + **一次可运行的验证**；不留「写了一半」的代码。
 > **同步约定**：每完成一个切片，更新 §20.1 的状态与 §20.2 的记录（含日期）；spec 与实现分开提交。
 
-### 20.1 当前阶段：P0 完成，下一阶段 P1（数据访问层与前台）
+### 20.1 当前阶段：P0+P1 完成，下一阶段 P3（编辑器标签选择 + 发布时间字段，与切读同批发布）
 
 | # | 切片 | 验证点（必须跑） | 状态 |
 | --- | --- | --- | --- |
@@ -1036,11 +1036,11 @@ v1.5 已确认**不保留双写**；v1.6 澄清批次：**P0 + P1 + P3 合并为
 - **2026-10-06** P0-②③ 完成并提交（`f6b1835`）：schema 加 `tags` / `post_tags` / `posts.published_at`；`pnpm db:generate` 生成 `drizzle/0001_wet_spyke.sql`（**只生成未执行**，§20.3 原约定）；rls.sql 加 RLS、`tags_public_read`（仅 `is_active = true` 可匿名读）、`post_tags` 无策略（不开放匿名直读）与 §14 的两个索引（`tags_active_idx` 按 §20.4 不建）。
 - **2026-10-06** P0-④ 完成并提交（`ab97d98`）：`scripts/backfill-tags.ts`——幂等回填（tags 按 `normalized_key` 复用、`post_tags` on conflict 跳过、`published_at` 只补空值并跑 §13.2 自查），复用 `src/lib/tags` 纯函数模块；typecheck 绿，Node 直跑冒烟通过（迁移未执行时对库干净失败回滚，证明加载/连接/事务路径可用）；**真实回填待迁移执行后**（见 §20.3 runbook）。
 - **2026-10-06** P0-⑤ 完成并提交（`7d71e8d`）：validator 改收 `PostTagInput[]` 并新增 `publishedAt`；`parseForm` 支持新 JSON 隐藏字段 + 旧逗号分支（§8.2 过渡期，P5 删）；`createPost`/`updatePost` 首次引入事务——先读旧关联再 diff 写 `post_tags`（保留 `created_at` 语义），发布留空填 `now()`，不再写 `posts.tags`；停用标签按 §8.2 规则 2/3 拒绝或保留；并发用不带 target 的 `on conflict do nothing` + 回查（§20.4）。验证：`pnpm test`（21 绿）+ typecheck + lint + build 全绿。**本地联调写路径前需先 `db:migrate` + 回填**。
+- **2026-10-06** P1 完成并提交（`8115df2`）：数据层——`listColumns` 标签改聚合子查询（`json_agg`，仅启用标签）、标签过滤改按 `tag_id` EXISTS（`listPublishedPosts` 入参 `tag` → `tagId`）、`getPostById`/`getPublishedPostBySlug` join 关系表返回 `TagOption[]`/`TagSummary[]`、`unnest` 聚合替换为 `tags + post_tags` 查询（`listPublicTagsWithCounts`，仅启用 + 已发布计数，提供缓存/未缓存两个出口）、新增 `resolvePublicTag`（§6.3 解析：slug 大小写不敏感 → normalized_key 回退，只回退一次）；前台——全部标签链接改用 slug、`tag-badge`/`post-card`/`home-feed`/搜索/详情/OG 图/分享海报改用 `TagSummary`、`/tags/[tag]` 接入 §6.3 解析 + `permanentRedirect` + 停用 404、sitemap 只输出启用且有已发布文章的标签、首页 chips 改独立查询（前 12 个）；后台——列表与仪表盘改 slug 链接、编辑页过渡期回显名称数组（P3 换组件）；`getDashboardStats`/`getPublishedStats` 的「今年」统一按 `published_at`（v1.6 补录口径）。验证：§11.1 三条机检断言只剩白名单（`scripts/backfill-tags.ts`）、typecheck + lint + build 全绿；**运行时验收（308 重定向、旧 URL 解析、首页 chips）待迁移 + 回填后按 §15.2 执行**。
 
-### 20.3 待办（P1 起，按 §16 阶段推进）
+### 20.3 待办（P3 起，按 §16 阶段与 §17.1 发布批次推进）
 
-- **P1** 数据访问层与前台改造：§11 的 API 形状 + §11.1 波及清单逐项处理（含 v1.6 补录的 `getDashboardStats` 口径）；完成标准是 §11.1 末尾的机检断言只剩白名单（`schema.ts` 列定义与 `scripts/backfill-tags.ts`）。
-- **P3** 编辑器标签选择组件（§8.1 交互契约：下拉 + 手输创建 + 键盘操作）+「发布时间」`datetime-local` 字段（§5.3、§16）。
+- **P3** 编辑器标签选择组件（§8.1 交互契约：下拉 + 手输创建 + 键盘操作 + 停用回显）+「发布时间」`datetime-local` 字段（§5.3）——**与 P0/P1 同批发布**（§17.1），完成后移除编辑页的名称数组过渡回显。
 - **P2 / P4**（后台标签管理 + 统计趋势）在切读观察期后发布，不与切读同批（§17.1）。
 - **P5** 删除 `posts.tags` 列与 `rls.sql:29` 的 `posts_tags_gin` 行、删除逗号兼容分支、文档同步。
 - **切读发布 runbook（P0+P1+P3 一次发布，§17.1）**：备份（Supabase/pg_dump）→ `pnpm db:migrate`（0001）→ 执行 `supabase/rls.sql`（新增段）→ `node scripts/backfill-tags.ts`（幂等，跑两次核对对账输出）→ 发布代码 → 验证 `posts.tags` 已冻结不再被写入、§15.1/§15.2 验收项。

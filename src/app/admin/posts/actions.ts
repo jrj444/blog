@@ -3,8 +3,14 @@
 import { redirect } from "next/navigation";
 import { revalidatePath, revalidateTag } from "next/cache";
 import { isAdmin } from "@/auth";
-import { postInputSchema, slugify, type PostInput } from "@/lib/validators/post";
-import { createPost, updatePost, deletePost, POSTS_CACHE_TAG } from "@/lib/db/queries";
+import { postInputSchema, slugify, type PostInput, type PostTagInput } from "@/lib/validators/post";
+import {
+  createPost,
+  updatePost,
+  deletePost,
+  TagWriteError,
+  POSTS_CACHE_TAG,
+} from "@/lib/db/queries";
 
 export type PostActionState = {
   errors?: Record<string, string[]>;
@@ -28,6 +34,64 @@ function revalidatePostCaches() {
   revalidatePath("/admin/posts");
 }
 
+/** parseForm 的字段级解析错误（tags JSON 损坏、publishedAt 格式非法等），转成表单字段错误 */
+class FormParseError extends Error {
+  field: string;
+  constructor(field: string, message: string) {
+    super(message);
+    this.field = field;
+  }
+}
+
+/**
+ * datetime-local 提交的是无时区字符串（YYYY-MM-DDTHH:mm[:ss]），必须按 Asia/Shanghai
+ * 解析成 timestamptz——不能 new Date(str) 裸解析，那会按服务器/UTC 解释产生 8 小时偏移
+ * （spec §5.3）。上海无夏令时，固定 +08:00 即可。
+ */
+const DATETIME_LOCAL_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+
+function parsePublishedAt(formData: FormData): Date | null | undefined {
+  const raw = formData.get("publishedAt");
+  if (raw === null) return undefined; // 表单还没有该字段（过渡期，§8.2）
+  const value = String(raw).trim();
+  if (value === "") return null; // 显式留空：草稿存 NULL，发布由服务端填 now()
+  if (!DATETIME_LOCAL_RE.test(value)) {
+    throw new FormParseError("publishedAt", "发布时间格式不正确");
+  }
+  const date = new Date(`${value.length === 16 ? `${value}:00` : value}+08:00`);
+  if (Number.isNaN(date.getTime())) {
+    throw new FormParseError("publishedAt", "发布时间无效");
+  }
+  return date;
+}
+
+/**
+ * 标签隐藏字段（§8.2 过渡期）：trim 后以 [ 开头按 JSON 数组解析（新标签选择组件，
+ * 元素形如 {id} / {name}）；否则按逗号切分（旧输入框），结果同样转成 [{name}]。
+ * 结构合法性交给 zod；解析失败给字段级错误，不得静默丢弃标签。P5 删除逗号分支。
+ */
+function parseTags(formData: FormData): PostTagInput[] {
+  const raw = String(formData.get("tags") ?? "").trim();
+  if (raw === "") return [];
+  if (raw.startsWith("[")) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new FormParseError("tags", "标签数据格式错误，请重新编辑标签");
+    }
+    if (!Array.isArray(parsed)) {
+      throw new FormParseError("tags", "标签数据格式错误，请重新编辑标签");
+    }
+    return parsed as PostTagInput[];
+  }
+  return raw
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean)
+    .map((name) => ({ name }));
+}
+
 // 把表单字段转成 zod 想要的结构；slug 留空则用 slugify(title)，中文标题空串时兜底
 function parseForm(formData: FormData): PostInput {
   const title = String(formData.get("title") ?? "");
@@ -42,13 +106,21 @@ function parseForm(formData: FormData): PostInput {
     excerpt: String(formData.get("excerpt") ?? ""),
     contentMd: String(formData.get("contentMd") ?? ""),
     coverImage: String(formData.get("coverImage") ?? "").trim(),
-    tags: String(formData.get("tags") ?? "")
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean),
+    tags: parseTags(formData),
+    publishedAt: parsePublishedAt(formData),
     // 底部两个提交按钮分别带 intent=draft / intent=publish（回车隐式提交时取第一个按钮，即草稿）
     published: formData.get("intent") === "publish",
   };
+}
+
+function toActionError(error: unknown): PostActionState {
+  if (error instanceof FormParseError) {
+    return { errors: { [error.field]: [error.message] } };
+  }
+  if (error instanceof TagWriteError) {
+    return { errors: { tags: [error.message] } };
+  }
+  return null;
 }
 
 export async function createPostAction(
@@ -57,12 +129,17 @@ export async function createPostAction(
 ): Promise<PostActionState> {
   if (!(await isAdmin())) return { message: "未授权" };
 
-  const parsed = postInputSchema.safeParse(parseForm(formData));
-  if (!parsed.success) {
-    return { errors: parsed.error.flatten().fieldErrors };
+  try {
+    const parsed = postInputSchema.safeParse(parseForm(formData));
+    if (!parsed.success) {
+      return { errors: parsed.error.flatten().fieldErrors };
+    }
+    await createPost(parsed.data);
+  } catch (error) {
+    const actionError = toActionError(error);
+    if (actionError) return actionError;
+    throw error;
   }
-
-  await createPost(parsed.data);
   revalidatePostCaches();
   redirect("/admin/posts");
 }
@@ -74,12 +151,17 @@ export async function updatePostAction(
 ): Promise<PostActionState> {
   if (!(await isAdmin())) return { message: "未授权" };
 
-  const parsed = postInputSchema.safeParse(parseForm(formData));
-  if (!parsed.success) {
-    return { errors: parsed.error.flatten().fieldErrors };
+  try {
+    const parsed = postInputSchema.safeParse(parseForm(formData));
+    if (!parsed.success) {
+      return { errors: parsed.error.flatten().fieldErrors };
+    }
+    await updatePost(id, parsed.data);
+  } catch (error) {
+    const actionError = toActionError(error);
+    if (actionError) return actionError;
+    throw error;
   }
-
-  await updatePost(id, parsed.data);
   revalidatePostCaches();
   redirect("/admin/posts");
 }

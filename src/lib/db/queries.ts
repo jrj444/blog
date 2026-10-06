@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { db, queryWithRetry } from "@/lib/db";
-import { posts } from "@/lib/db/schema";
+import { postTags, posts, tags } from "@/lib/db/schema";
 import {
   count,
   eq,
@@ -9,6 +9,7 @@ import {
   or,
   ilike,
   arrayContains,
+  inArray,
   desc,
   asc,
   lt,
@@ -16,7 +17,9 @@ import {
   sql,
   type SQL,
 } from "drizzle-orm";
-import { slugify, type PostInput } from "@/lib/validators/post";
+import { slugify, type PostInput, type PostTagInput } from "@/lib/validators/post";
+import { normalizeTagKey, normalizeTagName } from "@/lib/tags/normalize";
+import { buildTagSlug, withTagSlugSuffix } from "@/lib/tags/slug";
 import { escapeLike, normalizeSearchTerm } from "@/lib/db/search";
 
 // ---------- 列表投影 ----------
@@ -167,7 +170,13 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
     //    使用 Drizzle ORM .select() 而非 db.execute()，确保列名自动映射为 camelCase
     //    （db.execute 返回原始 snake_case 列名，会导致 createdAt 等字段 undefined → Invalid Date）。
     const [rows, [{ value: total }]] = await Promise.all([
-      db.select().from(posts).where(where).orderBy(desc(posts.createdAt)).limit(pageSize).offset(offset),
+      db
+        .select()
+        .from(posts)
+        .where(where)
+        .orderBy(desc(posts.createdAt))
+        .limit(pageSize)
+        .offset(offset),
       db.select({ value: count() }).from(posts).where(where),
     ]);
 
@@ -181,8 +190,6 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
     };
   });
 }
-
-
 
 // 后台编辑页：按 id 取（含草稿）
 export function getPostById(id: string) {
@@ -246,44 +253,218 @@ async function uniqueSlug(slug: string, exceptId?: string) {
   return slug;
 }
 
+/**
+ * 标签解析/写入的可恢复业务错误：信息面向用户，actions 层转成 tags 字段级错误，
+ * 不得静默丢弃标签（§8.1 / §8.2 规则 3）。
+ */
+export class TagWriteError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TagWriteError";
+  }
+}
+
+type TagTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+type TagRow = { id: string; name: string; normalizedKey: string; isActive: boolean };
+
+const tagColumns = {
+  id: tags.id,
+  name: tags.name,
+  normalizedKey: tags.normalizedKey,
+  isActive: tags.isActive,
+};
+
+/**
+ * 事务内创建新标签（§8.2 规则 3、7）。
+ * 不带 target 的 `on conflict do nothing` 同时覆盖 normalized_key 与 slug 两个唯一约束
+ * （一条 INSERT 只能写一个 ON CONFLICT 子句，§20.4）：插入成功返回新行；插入无效时按
+ * normalized_key 回查——命中 = 并发方已建（复用），未命中 = slug 被占，换后缀重试。
+ * 注意：事务内不得套 queryWithRetry（写操作重试会重复建标签，§8.2 规则 7）。
+ */
+async function createTagInTx(tx: TagTx, name: string, key: string): Promise<TagRow> {
+  const displayName = normalizeTagName(name);
+  const base = buildTagSlug(displayName);
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const slug = withTagSlugSuffix(base, attempt);
+    const inserted = await tx
+      .insert(tags)
+      .values({ name: displayName, normalizedKey: key, slug })
+      .onConflictDoNothing()
+      .returning(tagColumns);
+    if (inserted.length > 0) return inserted[0];
+    const [hit] = await tx
+      .select(tagColumns)
+      .from(tags)
+      .where(eq(tags.normalizedKey, key))
+      .limit(1);
+    if (hit) return hit;
+  }
+  throw new TagWriteError("标签创建冲突，请稍后重试");
+}
+
+/**
+ * 把表单提交的标签解析成 tag_id 列表（保持提交顺序，position 即顺序，§8.2 规则 1-3）。
+ *
+ * @param originallyAssociated 该文章现有的 tag_id 集合（新建文章传空集合）。
+ *   停用标签仅在「文章原本就有关联」时允许保留；未命中此条件（含 name 命中已有停用标签）
+ *   必须拒绝并提示，不得静默创建第二行同名标签（§8.2 规则 2/3）。
+ */
+async function resolvePostTags(
+  tx: TagTx,
+  inputs: PostTagInput[],
+  originallyAssociated: ReadonlySet<string>,
+): Promise<{ tagId: string; position: number }[]> {
+  // 1) 批量取候选：带 id 的按 id 查，带 name 的按 normalized_key 查（包含停用标签）
+  const ids = inputs.flatMap((input) => ("id" in input ? [input.id] : []));
+  const keys = [
+    ...new Set(inputs.flatMap((input) => ("name" in input ? [normalizeTagKey(input.name)] : []))),
+  ].filter(Boolean);
+
+  const byId = new Map<string, TagRow>();
+  const byKey = new Map<string, TagRow>();
+  if (ids.length > 0) {
+    const rows = await tx.select(tagColumns).from(tags).where(inArray(tags.id, ids));
+    for (const row of rows) byId.set(row.id, row);
+  }
+  if (keys.length > 0) {
+    const rows = await tx.select(tagColumns).from(tags).where(inArray(tags.normalizedKey, keys));
+    for (const row of rows) byKey.set(row.normalizedKey, row);
+  }
+
+  // 2) 按提交顺序解析，按 normalized_key 去重（React 与 REACT 只留先出现的一个，规则 1）
+  const resolved: { tagId: string; position: number }[] = [];
+  const seenKeys = new Set<string>();
+  for (const input of inputs) {
+    let tag: TagRow;
+    let key: string;
+    if ("id" in input) {
+      const hit = byId.get(input.id);
+      if (!hit) throw new TagWriteError("所选标签不存在或已被删除，请刷新后重试");
+      tag = hit;
+      key = hit.normalizedKey;
+    } else {
+      const name = normalizeTagName(input.name);
+      key = normalizeTagKey(name);
+      if (!key) throw new TagWriteError(`标签名称无效：「${input.name}」`);
+      const hit = byKey.get(key);
+      tag = hit ?? (await createTagInTx(tx, name, key));
+      byKey.set(key, tag);
+    }
+    if (seenKeys.has(key)) continue;
+    if (!tag.isActive && !originallyAssociated.has(tag.id)) {
+      throw new TagWriteError(`标签「${tag.name}」已停用，请先在标签管理里启用，或换一个标签`);
+    }
+    seenKeys.add(key);
+    resolved.push({ tagId: tag.id, position: resolved.length });
+  }
+  return resolved;
+}
+
+/**
+ * 事务内同步文章标签：「先读旧、再 diff」，**禁止全删重建**——那会重置
+ * post_tags.created_at（首次关联时间，§8.2 规则 4）。同一篇文章的并发编辑是
+ * last-write-wins（V1 接受，不加行锁）。
+ */
+async function syncPostTags(
+  tx: TagTx,
+  postId: string,
+  inputs: PostTagInput[],
+  originallyAssociated: ReadonlySet<string>,
+): Promise<void> {
+  const resolved = await resolvePostTags(tx, inputs, originallyAssociated);
+  const nextIds = new Set(resolved.map((r) => r.tagId));
+
+  // 移除：旧集合有、提交里没有
+  const removed = [...originallyAssociated].filter((tagId) => !nextIds.has(tagId));
+  if (removed.length > 0) {
+    await tx
+      .delete(postTags)
+      .where(and(eq(postTags.postId, postId), inArray(postTags.tagId, removed)));
+  }
+
+  // 保留：只更新 position（不动 created_at）；新增：插入
+  const inserts: { postId: string; tagId: string; position: number }[] = [];
+  for (const { tagId, position } of resolved) {
+    if (originallyAssociated.has(tagId)) {
+      await tx
+        .update(postTags)
+        .set({ position })
+        .where(and(eq(postTags.postId, postId), eq(postTags.tagId, tagId)));
+    } else {
+      inserts.push({ postId, tagId, position });
+    }
+  }
+  if (inserts.length > 0) {
+    // on conflict do nothing：并发保存撞主键时按幂等处理，避免把唯一约束错误抛给用户
+    await tx.insert(postTags).values(inserts).onConflictDoNothing();
+  }
+}
+
 export async function createPost(input: PostInput) {
   const slug = await uniqueSlug(input.slug || slugify(input.title));
 
-  const [row] = await db
-    .insert(posts)
-    .values({
-      title: input.title,
-      slug,
-      excerpt: input.excerpt || null,
-      contentMd: input.contentMd,
-      tags: input.tags,
-      published: input.published,
-      coverImage: input.coverImage || null,
-    })
-    .returning({ id: posts.id });
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .insert(posts)
+      .values({
+        title: input.title,
+        slug,
+        excerpt: input.excerpt || null,
+        contentMd: input.contentMd,
+        published: input.published,
+        coverImage: input.coverImage || null,
+        // §5.3：发布时留空由服务端填 now()，草稿留 NULL；posts.tags 数组列不再写入（硬切，§13.3）
+        publishedAt: input.published
+          ? (input.publishedAt ?? new Date())
+          : (input.publishedAt ?? null),
+      })
+      .returning({ id: posts.id });
 
-  return row;
+    await syncPostTags(tx, row.id, input.tags, new Set());
+    return row;
+  });
 }
 
 export async function updatePost(id: string, input: PostInput) {
   const slug = await uniqueSlug(input.slug || slugify(input.title), id);
 
-  const [row] = await db
-    .update(posts)
-    .set({
+  return db.transaction(async (tx) => {
+    // 先读旧关联：既是 diff 的基准，也是「停用标签原本就有关联」的判定依据（§8.2 规则 2/4）
+    const oldRows = await tx
+      .select({ tagId: postTags.tagId })
+      .from(postTags)
+      .where(eq(postTags.postId, id));
+    const originallyAssociated = new Set(oldRows.map((row) => row.tagId));
+
+    const patch: Partial<typeof posts.$inferInsert> = {
       title: input.title,
       slug,
       excerpt: input.excerpt || null,
       contentMd: input.contentMd,
-      tags: input.tags,
       published: input.published,
       coverImage: input.coverImage || null,
       updatedAt: new Date(),
-    })
-    .where(eq(posts.id, id))
-    .returning({ id: posts.id });
+    };
+    if (input.published) {
+      // 发布：按表单值，留空填 now()（§5.3）
+      patch.publishedAt = input.publishedAt ?? new Date();
+    } else if (input.publishedAt !== undefined) {
+      // 撤稿/存草稿：表单显式提交的时间照存（含 null = 清空）；
+      // undefined（过渡期表单还没有该字段）→ 不写 published_at，保留原值（§5.3）
+      patch.publishedAt = input.publishedAt;
+    }
 
-  return row;
+    const [row] = await tx
+      .update(posts)
+      .set(patch)
+      .where(eq(posts.id, id))
+      .returning({ id: posts.id });
+    if (!row) return row;
+
+    await syncPostTags(tx, id, input.tags, originallyAssociated);
+    return row;
+  });
 }
 
 export async function deletePost(id: string) {
@@ -387,10 +568,7 @@ const cachedListPublishedPosts = cached("list-published", queryListPublishedPost
  * 保证刚发布的文章能够立即出现在搜索结果里，而不受 60s 缓存窗口影响。
  * 仅供 searchPublishedPostsAction 调用，不对外暴露完整分页结构。
  */
-export async function searchPublishedPosts(
-  q: string,
-  limit = 8,
-): Promise<PostListItem[]> {
+export async function searchPublishedPosts(q: string, limit = 8): Promise<PostListItem[]> {
   const search = normalizeSearchTerm(q);
   if (!search) return [];
 
@@ -425,7 +603,6 @@ export const getPublishedPostBySlug = cached(
       where: and(eq(posts.slug, slug), eq(posts.published, true)),
     })) ?? null,
 );
-
 
 export type PostSibling = {
   slug: string;

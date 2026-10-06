@@ -1042,7 +1042,8 @@ v1.5 已确认**不保留双写**；v1.6 澄清批次：**P0 + P1 + P3 合并为
 - **2026-10-06** 备份工具就绪并提交（`4e00e6c`）：免费版 Supabase 无控制台备份，本机无 pg_dump、supabase CLI 依赖 Docker——新增 `scripts/backup-data.ts`（`pnpm db:backup`）：服务端 `quote_nullable` 生成 INSERT（转义由 Postgres 保证）、同一事务 TEMP 表回灌校验（行数 + 整表 md5，零持久写入）、产物写入 gitignore 的 `backups/`。首次备份已跑通：posts 2 行 + settings 0 行，回灌摘要一致。
 - **2026-10-06** 迁移与 RLS 已在真实库执行：`pnpm db:migrate`（0001_wet_spyke）由需求方执行成功；`supabase/rls.sql` 经新增的 `pnpm db:sql` 执行器（`b2c1d28`，走直连通道，语句切分保留 `$$` 函数体）执行 17 条语句。验收全过：posts/settings/tags/post_tags 四表 RLS 全开；策略恰为 `posts_public_read` + `tags_public_read`（`post_tags` 无策略＝匿名全拒）；`post_tags_tag_id_idx`、`posts_published_at_idx` 及两个 UNIQUE 索引就位；anon 不可调用 `increment_post_views`；`posts.published_at` 为 timestamptz。
 - **2026-10-06** 回填执行完成（需求方首跑 + 复核二跑）：对账 posts=2（不变）、tags=5（distinct key 5）、post_tags=6；§13.5 验收通过——每篇文章标签集合比对 0 不一致、`published = true and published_at is null` 自查 0、幂等成立（第二遍零新建）。标签清单（全部启用）：Cloudflare、Next.js、Supabase、Vercel、对象存储（中文 slug）。
-- **2026-10-06** 代码发布至生产；线上验收发现中文 slug 页面 404——定位为两层问题：(1) Next 16.3.3 的 page 与 metadata 收到的 params 编码状态不一致（page 未解码，实测记录于 §6.3）；(2) 本机 Git Bash 对含 `%` 的 curl URL 注入引号，导致首轮 curl 断言不可信（改用 node fetch 复核）。修复 `167f640`：`decodeRouteParam` 统一解码 + 重定向比较改用解码值（防循环）。本地干净请求验证：`/tags/%E5%AF%B9…` 200 且内容正确、ASCII 用例无回归。**待重新部署后复测**。
+- **2026-10-06** 代码发布至生产；线上验收发现中文 slug 页面 404——定位为两层问题：(1) Next 16.3.3 的 page 与 metadata 收到的 params 编码状态不一致（page 未解码，实测记录于 §6.3）；(2) 本机 Git Bash 对含 `%` 的 curl URL 注入引号，导致首轮 curl 断言不可信（改用 node fetch 复核）。修复 `167f640`：`decodeRouteParam` 统一解码 + 重定向比较改用解码值（防循环）。本地干净请求验证：`/tags/%E5%AF%B9…` 200 且内容正确、ASCII 用例无回归。
+- **2026-10-06** 需求方将「对象存储」的 slug 直接改库为 `object-storage`（name / normalized_key 保持不变——编辑器按 normalized_key 去重不受影响，展示名仍为中文）。生产复核（node fetch）：`/tags/object-storage` 200 且展示正确；旧中文 URL 404（slug 已不存在，V1 无别名重定向，符合 §6.3 设计）；sitemap、`/tags` 页、首页链接在 60s 缓存窗口过期后全部刷新为新 slug（直接改库不触发 `revalidateTag`，等窗口过期即可）。**当前数据下线上验收全部通过**；`167f640` 的解码修复随下次部署带上（对未来的 Unicode 标签是必要防线）。剩余手测：编辑器手输创建闭环（§15.2）、发布时间时区用例（§15.3）。
 
 ### 20.3 待办（切读发布 → 观察期 → P2/P4 → P5）
 
@@ -1055,7 +1056,7 @@ v1.5 已确认**不保留双写**；v1.6 澄清批次：**P0 + P1 + P3 合并为
   3. ✅ `pnpm db:sql supabase/rls.sql`（2026-10-06 已执行，验收全过）；
   4. ✅ `node scripts/backfill-tags.ts`（2026-10-06 两遍跑：第二遍零新建、对账一致——posts=2 不变、tags=5、post_tags=6；§13.5 验收通过：标签集合比对 0 不一致、published_at 自查 0 遗漏、幂等成立；**部署前需重跑一次**，因旧代码仍在写旧数组列）；
   5. ✅ 代码已发布（2026-10-06）；**`167f640` 的解码修复待重新部署**（见 6）；
-  6. ⬜ 验收进行中——生产已验证（用 node fetch 干净请求；注意 Windows Git Bash 会给含 `%` 的 curl URL 参数注入引号，curl 断言不可信）：`/tags` 200 且 5 个 slug 链接、sitemap 全 slug URL、`/tags/next.js`/`/tags/Next.js` 200、`/tags/React`（不存在）404、`/feed.xml` 200、数据库侧 `posts.tags` 冻结无写入。⏳ 重新部署后复测 `/tags/%E5%AF%B9…`（中文 slug）；308 重定向路径当前数据无法触发（5 个标签的名称与 slug 仅差大小写，按 §6.3 大小写不敏感直接命中 200），待出现「名称含空格」的标签后实测并回填结论。剩余手测项：编辑器手输创建闭环（§15.2）、发布时间时区用例（§15.3）。
+  6. ✅ 验收（2026-10-06，node fetch 干净请求）：`/tags` 5 个 slug 链接、sitemap 全 slug URL、`/tags/object-storage` 200、`/tags/next.js`/`/tags/Next.js` 200、`/tags/React`（不存在）404、`/feed.xml` 200、数据库侧 `posts.tags` 冻结无写入。308 重定向路径当前数据无法触发（标签名称与 slug 仅差大小写，按 §6.3 大小写不敏感直接命中 200），待出现「名称含空格」的标签后实测并回填结论。剩余手测项：编辑器手输创建闭环（§15.2）、发布时间时区用例（§15.3）。观察期（§13.3，建议一周）后进入 P2/P4。
 
 ### 20.4 实施约定
 

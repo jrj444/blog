@@ -330,6 +330,7 @@ select count(*) from posts where published = true and published_at is null;  -- 
 - 若某标签改名后，旧名称被另一个标签占用，那么旧的外部链接会指向新标签（内容漂移）。V1 接受该成本，不做检测（见 §18）。
 - 重定向的真实状态码需实测：`permanentRedirect()` 在流式渲染下只插入 meta 标签做客户端跳转，不保证返回 308。验收标准见 §15.2。
 - 解析需要查库，而 `src/proxy.ts` 没有 postgres 客户端，因此这一步只能在页面内完成，不能放进 middleware。
+- **实测 Next 16.3.3 行为（2026-10-06，§15.2 记录）**：同一次请求里，`generateMetadata` 拿到的 params 已解码，页面本体拿到的仍是百分号编码串（如 `%E5%AF%B9…`）——中文/Unicode slug 的页面会 404。已用 `decodeRouteParam`（`queries.ts`，`decodeURIComponent` + 畸形序列兜底）在 `resolvePublicTag` 与页面的重定向比较处统一解码；重定向比较必须用解码后的值，否则编码请求会被误判成「非 canonical」造成重定向循环。
 
 ---
 
@@ -1041,6 +1042,7 @@ v1.5 已确认**不保留双写**；v1.6 澄清批次：**P0 + P1 + P3 合并为
 - **2026-10-06** 备份工具就绪并提交（`4e00e6c`）：免费版 Supabase 无控制台备份，本机无 pg_dump、supabase CLI 依赖 Docker——新增 `scripts/backup-data.ts`（`pnpm db:backup`）：服务端 `quote_nullable` 生成 INSERT（转义由 Postgres 保证）、同一事务 TEMP 表回灌校验（行数 + 整表 md5，零持久写入）、产物写入 gitignore 的 `backups/`。首次备份已跑通：posts 2 行 + settings 0 行，回灌摘要一致。
 - **2026-10-06** 迁移与 RLS 已在真实库执行：`pnpm db:migrate`（0001_wet_spyke）由需求方执行成功；`supabase/rls.sql` 经新增的 `pnpm db:sql` 执行器（`b2c1d28`，走直连通道，语句切分保留 `$$` 函数体）执行 17 条语句。验收全过：posts/settings/tags/post_tags 四表 RLS 全开；策略恰为 `posts_public_read` + `tags_public_read`（`post_tags` 无策略＝匿名全拒）；`post_tags_tag_id_idx`、`posts_published_at_idx` 及两个 UNIQUE 索引就位；anon 不可调用 `increment_post_views`；`posts.published_at` 为 timestamptz。
 - **2026-10-06** 回填执行完成（需求方首跑 + 复核二跑）：对账 posts=2（不变）、tags=5（distinct key 5）、post_tags=6；§13.5 验收通过——每篇文章标签集合比对 0 不一致、`published = true and published_at is null` 自查 0、幂等成立（第二遍零新建）。标签清单（全部启用）：Cloudflare、Next.js、Supabase、Vercel、对象存储（中文 slug）。
+- **2026-10-06** 代码发布至生产；线上验收发现中文 slug 页面 404——定位为两层问题：(1) Next 16.3.3 的 page 与 metadata 收到的 params 编码状态不一致（page 未解码，实测记录于 §6.3）；(2) 本机 Git Bash 对含 `%` 的 curl URL 注入引号，导致首轮 curl 断言不可信（改用 node fetch 复核）。修复 `167f640`：`decodeRouteParam` 统一解码 + 重定向比较改用解码值（防循环）。本地干净请求验证：`/tags/%E5%AF%B9…` 200 且内容正确、ASCII 用例无回归。**待重新部署后复测**。
 
 ### 20.3 待办（切读发布 → 观察期 → P2/P4 → P5）
 
@@ -1052,8 +1054,8 @@ v1.5 已确认**不保留双写**；v1.6 澄清批次：**P0 + P1 + P3 合并为
   2. ✅ `pnpm db:migrate`（0001，2026-10-06 已执行）；
   3. ✅ `pnpm db:sql supabase/rls.sql`（2026-10-06 已执行，验收全过）；
   4. ✅ `node scripts/backfill-tags.ts`（2026-10-06 两遍跑：第二遍零新建、对账一致——posts=2 不变、tags=5、post_tags=6；§13.5 验收通过：标签集合比对 0 不一致、published_at 自查 0 遗漏、幂等成立；**部署前需重跑一次**，因旧代码仍在写旧数组列）；
-  5. ⬜ 发布代码（P0+P1+P3）；
-  6. ⬜ 验证 `posts.tags` 已冻结不再被写入、§15.1/§15.2/§15.3 验收项。
+  5. ✅ 代码已发布（2026-10-06）；**`167f640` 的解码修复待重新部署**（见 6）；
+  6. ⬜ 验收进行中——生产已验证（用 node fetch 干净请求；注意 Windows Git Bash 会给含 `%` 的 curl URL 参数注入引号，curl 断言不可信）：`/tags` 200 且 5 个 slug 链接、sitemap 全 slug URL、`/tags/next.js`/`/tags/Next.js` 200、`/tags/React`（不存在）404、`/feed.xml` 200、数据库侧 `posts.tags` 冻结无写入。⏳ 重新部署后复测 `/tags/%E5%AF%B9…`（中文 slug）；308 重定向路径当前数据无法触发（5 个标签的名称与 slug 仅差大小写，按 §6.3 大小写不敏感直接命中 200），待出现「名称含空格」的标签后实测并回填结论。剩余手测项：编辑器手输创建闭环（§15.2）、发布时间时区用例（§15.3）。
 
 ### 20.4 实施约定
 

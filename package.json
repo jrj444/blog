@@ -11,6 +11,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:backup": "node scripts/backup-data.ts",
+    "db:sql": "node scripts/execute-sql.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",

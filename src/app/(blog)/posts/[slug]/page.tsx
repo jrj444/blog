@@ -9,6 +9,7 @@ import { PostNavigation } from "@/components/blog/post-navigation";
 import { TagBadge } from "@/components/blog/tag-badge";
 import { ViewTracker } from "@/components/blog/view-tracker";
 import { SharePosterButton } from "@/components/blog/share-poster-modal";
+import { CopyContentButton } from "@/components/blog/copy-content-button";
 import { formatDate, toIsoString } from "@/lib/format-date";
 import { siteConfig, absUrl } from "@/lib/site";
 
@@ -147,20 +148,23 @@ export default async function PostPage({ params }: Props) {
         footer={
           <footer className="mt-14 space-y-6 border-t border-border pt-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <SharePosterButton
-                post={{
-                  title: post.title,
-                  slug: post.slug,
-                  excerpt: post.excerpt,
-                  tags: post.tags,
-                  date: formatDate(post.createdAt),
-                  readingMinutes: Math.max(
-                    1,
-                    Math.round(post.contentMd.replace(/\s/g, "").length / 350),
-                  ),
-                  url: postUrl,
-                }}
-              />
+              <div className="flex flex-wrap items-center gap-2">
+                <SharePosterButton
+                  post={{
+                    title: post.title,
+                    slug: post.slug,
+                    excerpt: post.excerpt,
+                    tags: post.tags,
+                    date: formatDate(post.createdAt),
+                    readingMinutes: Math.max(
+                      1,
+                      Math.round(post.contentMd.replace(/\s/g, "").length / 350),
+                    ),
+                    url: postUrl,
+                  }}
+                />
+                <CopyContentButton content={post.contentMd} />
+              </div>
               <Link
                 href="/posts"
                 className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ExternalLink, Eye, Feather, PenLine, Search } from "lucide-react";
 import { listPosts } from "@/lib/db/queries";
 import { DeletePostButton } from "@/components/admin/delete-post-button";
+import { CopyContentButton } from "@/components/blog/copy-content-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -236,6 +237,7 @@ export default async function AdminPostsPage({
                         >
                           编辑
                         </Link>
+                        <CopyContentButton content={post.contentMd} label="复制" variant="link" />
                         <DeletePostButton id={post.id} title={post.title} />
                       </div>
                     </td>

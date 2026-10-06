@@ -18,7 +18,7 @@ import {
 } from "drizzle-orm";
 import { slugify, type PostInput, type PostTagInput } from "@/lib/validators/post";
 import { normalizeTagKey, normalizeTagName } from "@/lib/tags/normalize";
-import { buildTagSlug, withTagSlugSuffix } from "@/lib/tags/slug";
+import { buildTagSlug, normalizeManualTagSlug, withTagSlugSuffix } from "@/lib/tags/slug";
 import { escapeLike, normalizeSearchTerm } from "@/lib/db/search";
 
 // ---------- 列表投影 ----------
@@ -875,6 +875,344 @@ export const resolvePublicTag = cached(
     return byKey ?? null;
   },
 );
+
+// ---------- 后台标签查询（不缓存，§12：管理员需要看到刚改完的数据） ----------
+
+export type AdminTagListItem = TagSummary & {
+  description: string | null;
+  isActive: boolean;
+  /** 已发布文章数（§7.2 展示列 / 默认排序键） */
+  publishedCount: number;
+  /** 总关联数（含草稿） */
+  totalRelations: number;
+  /** 最近使用时间 = 已发布文章的 max(published_at)；无已发布关联为 null（§10） */
+  lastUsedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type AdminTagListParams = {
+  /** 搜索名称 / slug / 描述（包含匹配） */
+  q?: string;
+  status?: "all" | "active" | "inactive" | "unused";
+  sort?: "posts" | "createdAt" | "updatedAt";
+};
+
+export async function listAdminTags(params: AdminTagListParams = {}): Promise<AdminTagListItem[]> {
+  return queryWithRetry(async () => {
+    const { q, status = "all", sort = "posts" } = params;
+    const term = q?.trim() ?? "";
+    const pattern = term ? `%${escapeLike(term)}%` : null;
+
+    const conditions: SQL[] = [];
+    if (pattern) {
+      conditions.push(
+        sql`(t.name ilike ${pattern} or t.slug ilike ${pattern} or t.description ilike ${pattern})`,
+      );
+    }
+    if (status === "active") conditions.push(sql`t.is_active`);
+    if (status === "inactive") conditions.push(sql`not t.is_active`);
+    if (status === "unused") {
+      conditions.push(sql`not exists (select 1 from ${postTags} pt where pt.tag_id = t.id)`);
+    }
+    const where = conditions.length > 0 ? sql`where ${and(...conditions)}` : sql``;
+    const orderBy =
+      sort === "createdAt"
+        ? sql`t.created_at desc`
+        : sort === "updatedAt"
+          ? sql`t.updated_at desc`
+          : sql`published_count desc, t.name`;
+
+    const rows = await db.execute(sql`
+      select t.id, t.name, t.slug, t.description, t.is_active, t.created_at, t.updated_at,
+             count(p.id) filter (where p.published)::int as published_count,
+             count(p.id)::int as total_relations,
+             max(p.published_at) filter (where p.published) as last_used_at
+      from ${tags} t
+      left join ${postTags} pt on pt.tag_id = t.id
+      left join ${posts} p on p.id = pt.post_id
+      ${where}
+      group by t.id
+      order by ${orderBy}
+    `);
+
+    return (
+      rows as unknown as ReadonlyArray<{
+        id: string;
+        name: string;
+        slug: string;
+        description: string | null;
+        is_active: boolean;
+        published_count: number;
+        total_relations: number;
+        last_used_at: Date | null;
+        created_at: Date;
+        updated_at: Date;
+      }>
+    ).map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      description: row.description,
+      isActive: row.is_active,
+      publishedCount: row.published_count,
+      totalRelations: row.total_relations,
+      lastUsedAt: row.last_used_at,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  });
+}
+
+/** 标签列表 KPI（§7.2）：总标签数与未使用标签数 */
+export type AdminTagKpis = { total: number; unused: number };
+
+export async function getAdminTagKpis(): Promise<AdminTagKpis> {
+  return queryWithRetry(async () => {
+    const rows = await db.execute(sql`
+      select count(*)::int as total,
+             count(*) filter (
+               where not exists (select 1 from ${postTags} pt where pt.tag_id = ${tags.id})
+             )::int as unused
+      from ${tags}
+    `);
+    const row = firstRow(rows as ReadonlyArray<Record<string, number>>);
+    return { total: row?.total ?? 0, unused: row?.unused ?? 0 };
+  });
+}
+
+export type AdminTagDetail = TagSummary & {
+  description: string | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export async function getAdminTagById(id: string): Promise<AdminTagDetail | undefined> {
+  return queryWithRetry(async () => {
+    const [row] = await db
+      .select({
+        id: tags.id,
+        name: tags.name,
+        slug: tags.slug,
+        description: tags.description,
+        isActive: tags.isActive,
+        createdAt: tags.createdAt,
+        updatedAt: tags.updatedAt,
+      })
+      .from(tags)
+      .where(eq(tags.id, id))
+      .limit(1);
+    return row;
+  });
+}
+
+/** 标签使用统计（§10）：阅读量为当前关联已发布文章的 views 总和（快照） */
+export type TagUsageStats = {
+  publishedCount: number;
+  draftCount: number;
+  /** 总关联数（含草稿） */
+  totalRelations: number;
+  totalViews: number;
+  lastUsedAt: Date | null;
+};
+
+export async function listTagUsageStats(tagId: string): Promise<TagUsageStats> {
+  return queryWithRetry(async () => {
+    const rows = await db.execute(sql`
+      select
+        count(p.id) filter (where p.published)::int as published_count,
+        count(p.id) filter (where not p.published)::int as draft_count,
+        count(p.id)::int as total_relations,
+        coalesce(sum(p.views) filter (where p.published), 0)::int as total_views,
+        max(p.published_at) filter (where p.published) as last_used_at
+      from ${postTags} pt
+      join ${posts} p on p.id = pt.post_id
+      where pt.tag_id = ${tagId}::uuid
+    `);
+    const row = firstRow(
+      rows as unknown as ReadonlyArray<{
+        published_count: number;
+        draft_count: number;
+        total_relations: number;
+        total_views: number;
+        last_used_at: Date | null;
+      }>,
+    );
+    return {
+      publishedCount: row?.published_count ?? 0,
+      draftCount: row?.draft_count ?? 0,
+      totalRelations: row?.total_relations ?? 0,
+      totalViews: row?.total_views ?? 0,
+      lastUsedAt: row?.last_used_at ?? null,
+    };
+  });
+}
+
+/** 趋势点：跨缓存/渲染边界只传原始类型（§10） */
+export type TagTrendPoint = { month: string; count: number };
+
+/**
+ * 近 N 个月新增已发布文章趋势，按 Asia/Shanghai 分月（§10，窗口起点须转回 timestamptz）。
+ * UI 直接拿到连续 N 个自然月、缺失月份补 0 的完整序列。
+ */
+export async function listTagMonthlyTrend(tagId: string, months = 12): Promise<TagTrendPoint[]> {
+  return queryWithRetry(async () => {
+    const rows = await db.execute(sql`
+      select to_char(date_trunc('month', p.published_at at time zone 'Asia/Shanghai'), 'YYYY-MM') as month,
+             count(*)::int as count
+      from ${postTags} pt
+      join ${posts} p on p.id = pt.post_id
+      where pt.tag_id = ${tagId}::uuid
+        and p.published = true
+        and p.published_at is not null
+        and p.published_at >= (
+          (date_trunc('month', now() at time zone 'Asia/Shanghai') - ((${months - 1}) || ' months')::interval)
+          at time zone 'Asia/Shanghai'
+        )
+      group by 1
+      order by 1
+    `);
+    const byMonth = new Map(
+      (rows as unknown as ReadonlyArray<{ month: string; count: number }>).map((r) => [
+        r.month,
+        r.count,
+      ]),
+    );
+
+    // 以 Asia/Shanghai 的当前月为终点补零
+    const shanghaiNow = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    const points: TagTrendPoint[] = [];
+    for (let i = months - 1; i >= 0; i--) {
+      const d = new Date(Date.UTC(shanghaiNow.getUTCFullYear(), shanghaiNow.getUTCMonth() - i, 1));
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+      points.push({ month: key, count: byMonth.get(key) ?? 0 });
+    }
+    return points;
+  });
+}
+
+// ---------- 标签写入（不缓存，供后台 Server Action 调用） ----------
+
+export type CreatedTag = { id: string; name: string; slug: string };
+
+export type CreateTagResult =
+  | { ok: true; tag: CreatedTag }
+  | { ok: false; reason: "nameConflict"; existing: CreatedTag }
+  | { ok: false; reason: "slugConflict"; slug: string };
+
+/**
+ * 新建标签（§7.3）：normalized_key 冲突报错并带回既有标签；自动 slug 冲突追加编号；
+ * 手工 slug 冲突直接报错（手工值先经 normalizeManualTagSlug 归一化与校验）。
+ */
+export async function createTag(input: {
+  name: string;
+  manualSlug?: string;
+  description: string | null;
+  isActive: boolean;
+}): Promise<CreateTagResult> {
+  const displayName = normalizeTagName(input.name);
+  const key = normalizeTagKey(input.name);
+  if (!key) return { ok: false, reason: "slugConflict", slug: "" };
+
+  const [nameHit] = await db
+    .select({ id: tags.id, name: tags.name, slug: tags.slug })
+    .from(tags)
+    .where(eq(tags.normalizedKey, key))
+    .limit(1);
+  if (nameHit) return { ok: false, reason: "nameConflict", existing: nameHit };
+
+  const values = {
+    name: displayName,
+    normalizedKey: key,
+    isActive: input.isActive,
+    description: input.description,
+  };
+
+  if (input.manualSlug) {
+    const slug = normalizeManualTagSlug(input.manualSlug); // 抛错由 action 转 slug 字段错误
+    const [slugHit] = await db
+      .select({ id: tags.id })
+      .from(tags)
+      .where(eq(tags.slug, slug))
+      .limit(1);
+    if (slugHit) return { ok: false, reason: "slugConflict", slug };
+    const [row] = await db
+      .insert(tags)
+      .values({ ...values, slug })
+      .returning({ id: tags.id, name: tags.name, slug: tags.slug });
+    return { ok: true, tag: row };
+  }
+
+  // 自动 slug：冲突追加编号，与唯一索引冲突重试同一循环（§8.2 规则 7 / §20.4）
+  const base = buildTagSlug(displayName);
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const slug = withTagSlugSuffix(base, attempt);
+    const inserted = await db
+      .insert(tags)
+      .values({ ...values, slug })
+      .onConflictDoNothing()
+      .returning({ id: tags.id, name: tags.name, slug: tags.slug });
+    if (inserted.length > 0) return { ok: true, tag: inserted[0] };
+    const [keyHit] = await db
+      .select({ id: tags.id, name: tags.name, slug: tags.slug })
+      .from(tags)
+      .where(eq(tags.normalizedKey, key))
+      .limit(1);
+    if (keyHit) return { ok: true, tag: keyHit };
+  }
+  return { ok: false, reason: "slugConflict", slug: base };
+}
+
+/**
+ * 编辑标签（§7.4）：name / description / is_active 可改，slug 不动；
+ * 重命名先按新 normalized_key 查冲突（排除自身），冲突时拒绝保存。
+ */
+export async function updateTagRow(input: {
+  id: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+}): Promise<{ ok: true } | { ok: false; reason: "nameConflict"; existing: CreatedTag }> {
+  const displayName = normalizeTagName(input.name);
+  const key = normalizeTagKey(input.name);
+  const [conflict] = await db
+    .select({ id: tags.id, name: tags.name, slug: tags.slug })
+    .from(tags)
+    .where(and(eq(tags.normalizedKey, key), ne(tags.id, input.id)))
+    .limit(1);
+  if (conflict) return { ok: false, reason: "nameConflict", existing: conflict };
+
+  await db
+    .update(tags)
+    // updatedAt 由应用层显式写入（无数据库触发器，§12）
+    .set({
+      name: displayName,
+      normalizedKey: key,
+      description: input.description,
+      isActive: input.isActive,
+      updatedAt: new Date(),
+    })
+    .where(eq(tags.id, input.id));
+  return { ok: true };
+}
+
+export async function setTagActive(id: string, isActive: boolean): Promise<void> {
+  await db.update(tags).set({ isActive, updatedAt: new Date() }).where(eq(tags.id, id));
+}
+
+/** 硬删除（§7.5）：只允许无任何文章关联的标签；FK RESTRICT 之上先做应用层检查给出可读错误 */
+export async function deleteTagById(
+  id: string,
+): Promise<{ ok: true } | { ok: false; reason: "hasRelations" }> {
+  const [{ value }] = await db
+    .select({ value: count() })
+    .from(postTags)
+    .where(eq(postTags.tagId, id));
+  if (value > 0) return { ok: false, reason: "hasRelations" };
+  await db.delete(tags).where(eq(tags.id, id));
+  return { ok: true };
+}
 
 // ---------- 媒体库反向引用扫描 ----------
 

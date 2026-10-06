@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ExternalLink, FileText, ImageIcon, LayoutDashboard, PenLine, Rss } from "lucide-react";
+import {
+  ExternalLink,
+  FileText,
+  ImageIcon,
+  LayoutDashboard,
+  PenLine,
+  Rss,
+  Tags,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -27,6 +35,12 @@ const WORKSPACE_ITEMS: NavItem[] = [
     isActive: (pathname) =>
       pathname === "/admin/posts" ||
       (pathname.startsWith("/admin/posts/") && !pathname.startsWith("/admin/posts/new")),
+  },
+  {
+    href: "/admin/tags",
+    label: "标签",
+    icon: Tags,
+    isActive: (pathname) => pathname.startsWith("/admin/tags"),
   },
   {
     href: "/admin/media",

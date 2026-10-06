@@ -1,6 +1,6 @@
 # 标签管理体系 Spec v1.6
 
-> 状态：Draft v1.6（评审修订版，待确认）  
+> 状态：✅ v1.6 已实施完成（2026-10-06，P0–P5 全部上线；过程见 §20）  
 > 日期：2026-10-06（v1.6 复核）；2026-09-23（v1.5 评审）  
 > 关联文档：`specs/spec-jiangruijians-blog.md`  
 > 目标：将标签从 `posts.tags text[]` 中独立出来，提供标签重命名、停用、趋势统计和防重复能力。
@@ -484,7 +484,7 @@ tags: z
 - `PostInput.tags` 由 `string[]` 改为 `PostTagInput[]`；`parseForm`（`src/app/admin/posts/actions.ts:44-48`）改为解析该隐藏字段，不再无条件 `split(",")`；若解析失败要给出字段级错误而不是静默丢弃标签。
 - 事务内不要套 `queryWithRetry`：它只针对只读查询，写操作重试可能重复建标签（见 `src/lib/db/index.ts` 的注释）。
 
-过渡期兼容（P0–P5，P5 删除）：
+过渡期兼容（P0–P5，**该分支已于 P5 删除**）：
 
 - `parseForm` **同时接受两种 `tags` 字段**：trim 后以 `[` 开头按 JSON 数组解析（新组件），否则按逗号切分（旧输入框）。这样写路径改造可以先于编辑器组件上线，P5 再删掉逗号分支。
 - **不双写 `posts.tags`**（已确认硬切，§13.3）：切读后该列冻结为只读遗留数据，直到 P5 删除。
@@ -593,8 +593,9 @@ listTagUsageStats(tagId): Promise<TagUsageStats>
 listTagMonthlyTrend(tagId, months): Promise<TagTrendPoint[]>
 listPublicTagsWithCounts(): Promise<TagSummaryWithCount[]>
 resolvePublicTag(routeValue): Promise<ResolvedTag | null>
-listPostTags(postIds): Promise<Map<string, TagSummary[]>>
 ```
+
+> **实施偏差（2026-10-06 收尾核对）**：原建议的 `listPostTags(postIds): Promise<Map<string, TagSummary[]>>` **未实现**——列表标签改由 `listColumns` 的聚合子查询直接带出（§11.1），首页 chips 改用 `listPublicTagsWithCounts`；且 `Map` 跨 `unstable_cache` 边界会被序列化成 `{}`（§20.4），该接口不再需要。其余接口均已实现（命名如上，落点 `src/lib/db/queries.ts`）。
 
 统一类型：
 
@@ -669,7 +670,7 @@ rg -n "encodeURIComponent\((tag|t)\)" src/
 rg -n "tags: string\[\]" src/
 ```
 
-白名单只有两处：`src/lib/db/schema.ts`（列定义，P5 删除）与 `scripts/backfill-tags.ts`（一次性回填脚本）。
+白名单（**P5 后核对，2026-10-06**）：`schema.ts` 的列定义已随 0002 迁移删除；现仅剩 `scripts/backfill-tags.ts`（已退役脚本）头部注释中的字样，全仓库无任何代码读写该列。
 
 注意：`getPublishedStats`（`queries.ts:496-516`）改用 `published_at` 后同样要处理缓存边界（现返回 ISO 字符串，保持一致即可）；`getDashboardStats`（`queries.ts:211-233`）不缓存，直接改 SQL 即可。
 
@@ -901,7 +902,7 @@ create index posts_published_at_idx on posts (published, published_at);
 - `pnpm lint`
 - `pnpm test`（新增，见下）
 - `pnpm build`
-- 主要查询执行 `EXPLAIN ANALYZE`（标签页、计数、趋势）
+- 主要查询执行 `EXPLAIN ANALYZE`（标签页、计数、趋势）——**2026-10-06 已执行**：过滤/投影走 `post_tags_tag_id_idx`（Index Only Scan）与联合主键位图扫描、计数走 PK 位图扫描 + Hash Join、趋势走 Index Only Scan，均毫秒级；`posts` 侧 Seq Scan 系 2 行小表的正常选择，数据量增长后受 `posts_published_at_idx` 保护
 - 迁移前后核对 `posts`、`tags`、`post_tags` 数量
 
 单测（**已确认选型：Vitest**）：
@@ -1047,6 +1048,7 @@ v1.5 已确认**不保留双写**；v1.6 澄清批次：**P0 + P1 + P3 合并为
 - **2026-10-06** P2+P4 完成并提交（`84becc4`）：后台新增 `/admin/tags`（KPI 两卡、搜索名称/slug/描述、状态筛选[全部/启用/停用/未使用]、三种排序、表格展示[已发布数/总关联/状态/最近使用]、行内停用/启用表单、未使用才显示删除）、`/admin/tags/new`、`/admin/tags/[id]`（编辑表单 + §10 四项统计卡[阅读量标注快照] + 12 个月趋势条形图[Asia/Shanghai 分月、缺失补零、服务端渲染]）；侧边栏「文章」与「媒体库」之间加入「标签」入口（§7.1）。数据层：`listAdminTags` / `getAdminTagKpis` / `getAdminTagById` / `listTagUsageStats` / `listTagMonthlyTrend`（全部不缓存，§12）与写入助手 `createTag`（key 冲突报错带回既有标签、自动 slug 追编号、手工 slug 冲突直接报错）/ `updateTagRow`（重命名查冲突排除自身、应用层写 updatedAt）/ `setTagActive` / `deleteTagById`（有关联拒绝）。Server Actions 用 **`updateTag(POSTS_CACHE_TAG)` 立即失效**（§12）+ `revalidatePath` 三件套；删除/停用守卫 + AlertDialog 确认沿用 delete-post 模式。验证：typecheck + lint + test（21 绿）+ build 全绿；后台页面需登录态，联调由需求方在浏览器执行（§15.3 手测清单）。
 - **2026-10-06** 概览页可达性修复（`e1e8be7`）：需求方反馈统计与趋势「不在概览页」——统计/趋势按 §7.1 设计在标签详情页，但概览页「标签分布」卡片原点击跳前台标签页，没有通往后台详情的入口。改为：卡片标签点击直达 `/admin/tags/[id]`（统计 + 趋势所在），卡片头部新增「标签管理 →」入口。
 - **2026-10-06** P5 完成代码侧并提交（`0408435`，需求方确认测试通过后执行）：① 删列前备份（`pnpm db:backup`，11.4KB 回灌校验一致）；② `schema.ts` 删除旧标签数组列，`pnpm db:generate` 生成 `drizzle/0002_cute_bedlam.sql`（仅一条 `ALTER TABLE "posts" DROP COLUMN "tags";`，**未执行**——线上旧构建编译期绑定该列名，必须先部署再迁移，否则全站 500，教训已写入 DEPLOY.md）；③ `rls.sql` 删除 `posts_tags_gin` 行（列删除时索引由 Postgres 级联移除）；④ `parseForm` 删除逗号兼容分支（非 JSON 一律字段错误）；⑤ 回填脚本标注退役（保留作迁移历史）；⑥ 文档同步：主 SPEC（表结构 / 目录 / RLS / S7 / 偏差说明 / 2026-10-06 进度）、README（功能 / 脚本表 / 目录 / 缓存说明）、DEPLOY（破坏性迁移的部署顺序）。验证：typecheck + lint + test（21 绿）+ build 全绿；机检断言 1 仅剩退役脚本的注释、2/3 零命中。
+- **2026-10-06** 项目收尾核对与归档（`9b7a7e3` + 本次）：代码推送上线（`ff3971f..233138b`）后生产终验全绿（§20.3）；需求方在部署前自行执行了 0002 迁移（顺序偏差，未造成中断，教训记录于 §20.3）；整体复核 spec 查漏并补充四处文本——§11 记录 `listPostTags` 的实施偏差、§11.1 白名单更新为 P5 后状态、§8.2 标注过渡期分支已删、**§15.4 补跑 EXPLAIN ANALYZE**（过滤/计数/趋势三条查询均按设计命中索引，毫秒级）；文档头改为「已实施完成」。
 
 ### 20.3 收尾记录（2026-10-06）
 

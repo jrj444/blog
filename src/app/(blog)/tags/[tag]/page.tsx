@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Feather } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound, permanentRedirect } from "next/navigation";
-import { listPublishedPosts, resolvePublicTag } from "@/lib/db/queries";
+import { listPublishedPosts, resolvePublicTag, decodeRouteParam } from "@/lib/db/queries";
 import { PostCard } from "@/components/blog/post-card";
 import { Pagination } from "@/components/blog/pagination";
 
@@ -45,8 +45,10 @@ export default async function TagPage({ params, searchParams }: Props) {
     notFound();
   }
 
-  // 最终地址与当前 URL 不同 → 永久重定向到 canonical slug（§6.3）
-  if (routeValue.toLowerCase() !== resolved.slug) {
+  // 最终地址与当前 URL 不同 → 永久重定向到 canonical slug（§6.3）。
+  // 比较用解码后的值：页面收到的 params 可能仍是百分号编码（见 decodeRouteParam），
+  // 直接比较会把编码请求误判成「非 canonical」造成重定向循环
+  if (decodeRouteParam(routeValue).toLowerCase() !== resolved.slug) {
     permanentRedirect(`/tags/${encodeURIComponent(resolved.slug)}`);
   }
 

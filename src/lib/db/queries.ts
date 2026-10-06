@@ -828,8 +828,24 @@ export const listPublicTagsWithCounts = cached(
 export const listPublicTagsWithCountsUncached = queryPublicTagsWithCounts;
 
 /**
+ * 解码 /tags/[slug] 的路由参数。
+ *
+ * 实测 Next 16.3.3：同一次请求里 generateMetadata 拿到的 params 已解码，
+ * 页面本体拿到的仍是百分号编码串（如 `%E5%AF%B9…`）——直接查库会 404。
+ * 这里统一解码一次；畸形 % 序列按原值处理，解码前后一致时无副作用。
+ */
+export function decodeRouteParam(value: string): string {
+  try {
+    const decoded = decodeURIComponent(value);
+    return decoded === value ? value : decoded;
+  } catch {
+    return value;
+  }
+}
+
+/**
  * 解析 /tags/[slug] 的路由参数（§6.3）：
- * 1. 入参 toLowerCase() 后精确匹配 tags.slug——slug 全小写存储；不要用 lower(tags.slug)
+ * 1. 入参解码后 toLowerCase() 精确匹配 tags.slug——slug 全小写存储；不要用 lower(tags.slug)
  *    比较，那会绕开唯一索引；
  * 2. 未命中时把 URL 参数按标签名称归一化，匹配 normalized_key（兼容迁移前的名称型旧
  *    URL，只回退一次、不追历史链）；
@@ -838,6 +854,8 @@ export const listPublicTagsWithCountsUncached = queryPublicTagsWithCounts;
 export const resolvePublicTag = cached(
   "resolve-public-tag",
   async (routeValue: string): Promise<ResolvedTag | null> => {
+    // 解码后再匹配：页面本体与 metadata 收到的 params 编码状态可能不同
+    const input = decodeRouteParam(routeValue);
     const columns = {
       id: tags.id,
       name: tags.name,
@@ -848,10 +866,10 @@ export const resolvePublicTag = cached(
     const [bySlug] = await db
       .select(columns)
       .from(tags)
-      .where(eq(tags.slug, routeValue.toLowerCase()))
+      .where(eq(tags.slug, input.toLowerCase()))
       .limit(1);
     if (bySlug) return bySlug;
-    const key = normalizeTagKey(routeValue);
+    const key = normalizeTagKey(input);
     if (!key) return null;
     const [byKey] = await db.select(columns).from(tags).where(eq(tags.normalizedKey, key)).limit(1);
     return byKey ?? null;

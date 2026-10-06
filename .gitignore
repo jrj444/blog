@@ -45,3 +45,6 @@ build-log.txt
 next-env.d.ts
 
 !.env.example
+
+# 本地数据库备份（免费版 Supabase 用 scripts/backup-data.ts 生成，体积可能很大且含全站内容）
+backups/

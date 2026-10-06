@@ -1,12 +1,17 @@
 import { notFound } from "next/navigation";
-import { getPostById } from "@/lib/db/queries";
+import { getPostById, listPublicTagsWithCountsUncached } from "@/lib/db/queries";
+import { toDatetimeLocal } from "@/lib/format-date";
 import { updatePostAction } from "../actions";
 import { PostForm } from "@/components/admin/post-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 export default async function EditPostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const post = await getPostById(id);
+  // 候选不缓存：编辑器要能看到刚创建的标签（§12）
+  const [post, tagOptions] = await Promise.all([
+    getPostById(id),
+    listPublicTagsWithCountsUncached(),
+  ]);
   if (!post) notFound();
 
   return (
@@ -21,15 +26,17 @@ export default async function EditPostPage({ params }: { params: Promise<{ id: s
       />
       <PostForm
         action={updatePostAction.bind(null, post.id)}
+        tagOptions={tagOptions}
         defaultValues={{
           title: post.title,
           slug: post.slug,
           excerpt: post.excerpt ?? "",
           contentMd: post.contentMd,
           coverImage: post.coverImage ?? "",
-          // 过渡期（§8.2）：编辑器还是逗号输入框，回显为名称数组（含停用标签，提交后
-          // 由服务端按 normalized_key 解析回既有关联）；P3 换标签选择组件时移除
-          tags: post.tags.map((t) => t.name),
+          // 含停用标签：组件以「已停用」标记回显，提交时按 {id} 原样保留关联（§8.2 规则 2）
+          tags: post.tags,
+          // 留空回显（草稿无发布时间）→ 提交空串；发布时由服务端填 now()（§5.3）
+          publishedAt: post.publishedAt ? toDatetimeLocal(post.publishedAt) : "",
           published: post.published,
         }}
       />

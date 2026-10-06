@@ -3,29 +3,37 @@
 import { useActionState, useRef, useState } from "react";
 import { ImagePlus, LoaderCircle } from "lucide-react";
 import { PostEditor } from "./post-editor";
+import { TagSelect } from "./tag-select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { toDatetimeLocal } from "@/lib/format-date";
+import type { TagOption, TagSummaryWithCount } from "@/lib/db/queries";
 import type { PostActionState } from "@/app/admin/posts/actions";
 import { createCoverUploadAction } from "@/app/admin/posts/upload-action";
 import { compressImage, MAX_SOURCE_BYTES } from "@/lib/compress-image";
 
 type Props = {
   action: (prev: PostActionState, formData: FormData) => Promise<PostActionState>;
+  /** 标签候选：仅启用中的标签，按已发布文章数倒序（§8.1） */
+  tagOptions: TagSummaryWithCount[];
   defaultValues?: {
     title?: string;
     slug?: string;
     excerpt?: string;
     contentMd?: string;
     coverImage?: string;
-    tags?: string[];
+    /** 编辑回显：含停用标签（组件内以「已停用」标记） */
+    tags?: TagOption[];
+    /** datetime-local 值（Asia/Shanghai）；空串 = 显式留空；undefined = 新建，默认当前时间 */
+    publishedAt?: string;
     published?: boolean;
   };
 };
 
-export function PostForm({ action, defaultValues }: Props) {
+export function PostForm({ action, tagOptions, defaultValues }: Props) {
   const [state, formAction] = useActionState(action, null);
   const [markdown, setMarkdown] = useState(defaultValues?.contentMd ?? "");
   const contentRef = useRef<HTMLInputElement>(null);
@@ -169,13 +177,31 @@ export function PostForm({ action, defaultValues }: Props) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="post-tags">标签（逗号分隔）</Label>
+          <Label htmlFor="post-published-at">发布时间</Label>
           <Input
-            id="post-tags"
-            name="tags"
-            placeholder="多个标签用逗号分隔"
-            defaultValue={(defaultValues?.tags ?? []).join(",")}
+            id="post-published-at"
+            name="publishedAt"
+            type="datetime-local"
+            defaultValue={defaultValues?.publishedAt ?? toDatetimeLocal(new Date())}
+            aria-invalid={Boolean(state?.errors?.publishedAt)}
           />
+          <p className="text-xs text-muted-foreground">
+            北京时间（UTC+8）。发布时留空则自动填当前时间；改了发布时间，趋势统计会跟着变。
+          </p>
+          {state?.errors?.publishedAt && (
+            <p className="text-sm text-destructive">{state.errors.publishedAt[0]}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="post-tags">标签</Label>
+          <TagSelect candidates={tagOptions} defaultTags={defaultValues?.tags ?? []} />
+          <p className="text-xs text-muted-foreground">
+            下拉选择已有标签；没有就输入新名称，保存时自动创建（不同大小写/全半角会归并为同一个标签）。
+          </p>
+          {state?.errors?.tags && (
+            <p className="text-sm text-destructive">{state.errors.tags[0]}</p>
+          )}
         </div>
       </section>
 

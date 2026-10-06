@@ -31,3 +31,17 @@ export function toIsoString(value: Date | string): string {
 export function toUtcString(value: Date | string): string {
   return toDate(value).toUTCString();
 }
+
+/** Asia/Shanghai 固定 UTC+8（无夏令时，spec §5.3） */
+const SHANGHAI_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+/**
+ * 格式化为 `<input type="datetime-local">` 的值（YYYY-MM-DDTHH:mm），按 Asia/Shanghai（§5.3）。
+ * 与服务端 parseForm 的 +08:00 解析互为逆操作：表单提交「2026-01-01 00:30」存的是
+ * 2025-12-31T16:30Z，这里回显还原成 2026-01-01T00:30。
+ */
+export function toDatetimeLocal(value: Date | string): string {
+  const shifted = new Date(toDate(value).getTime() + SHANGHAI_OFFSET_MS);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${shifted.getUTCFullYear()}-${pad(shifted.getUTCMonth() + 1)}-${pad(shifted.getUTCDate())}T${pad(shifted.getUTCHours())}:${pad(shifted.getUTCMinutes())}`;
+}

@@ -1040,6 +1040,7 @@ v1.5 已确认**不保留双写**；v1.6 澄清批次：**P0 + P1 + P3 合并为
 - **2026-10-06** P3 完成并提交（`32a9af5`）：新增 `src/components/admin/tag-select.tsx`——§8.1 交互契约全项落地（聚焦展开候选[仅启用]、关键词过滤 name/slug、↑↓/Enter/Backspace/Esc 键盘操作、chip 可移除、上限 10、normalized_key 精确匹配优先于创建、无匹配时「创建 "xxx"」项本地记 `{name}`、停用标签琥珀色「已停用」回显可移除不可加回）；隐藏字段按 §8.2 写 JSON 数组（React 19 不同步受控 hidden input，沿用 contentRef 的 DOM 直写模式）；post-form 移除逗号输入框，新增「发布时间」`datetime-local`（新建默认当前时间，编辑回显留空草稿为空）；`format-date.ts` 新增 `toDatetimeLocal`（与 parseForm 的 +08:00 解析互为逆操作）；新建/编辑页传未缓存候选（`listPublicTagsWithCountsUncached`，§12）。验证：typecheck + lint + test（21 绿）+ build 全绿；**§8.1 的手测清单与 §15.3 的时区用例待迁移 + 回填后联调执行**。
 - **2026-10-06** 备份工具就绪并提交（`4e00e6c`）：免费版 Supabase 无控制台备份，本机无 pg_dump、supabase CLI 依赖 Docker——新增 `scripts/backup-data.ts`（`pnpm db:backup`）：服务端 `quote_nullable` 生成 INSERT（转义由 Postgres 保证）、同一事务 TEMP 表回灌校验（行数 + 整表 md5，零持久写入）、产物写入 gitignore 的 `backups/`。首次备份已跑通：posts 2 行 + settings 0 行，回灌摘要一致。
 - **2026-10-06** 迁移与 RLS 已在真实库执行：`pnpm db:migrate`（0001_wet_spyke）由需求方执行成功；`supabase/rls.sql` 经新增的 `pnpm db:sql` 执行器（`b2c1d28`，走直连通道，语句切分保留 `$$` 函数体）执行 17 条语句。验收全过：posts/settings/tags/post_tags 四表 RLS 全开；策略恰为 `posts_public_read` + `tags_public_read`（`post_tags` 无策略＝匿名全拒）；`post_tags_tag_id_idx`、`posts_published_at_idx` 及两个 UNIQUE 索引就位；anon 不可调用 `increment_post_views`；`posts.published_at` 为 timestamptz。
+- **2026-10-06** 回填执行完成（需求方首跑 + 复核二跑）：对账 posts=2（不变）、tags=5（distinct key 5）、post_tags=6；§13.5 验收通过——每篇文章标签集合比对 0 不一致、`published = true and published_at is null` 自查 0、幂等成立（第二遍零新建）。标签清单（全部启用）：Cloudflare、Next.js、Supabase、Vercel、对象存储（中文 slug）。
 
 ### 20.3 待办（切读发布 → 观察期 → P2/P4 → P5）
 
@@ -1050,7 +1051,7 @@ v1.5 已确认**不保留双写**；v1.6 澄清批次：**P0 + P1 + P3 合并为
   1. ✅ 备份工具就绪（`pnpm db:backup`，见 §17）——**部署前重跑一次拿最新数据**；
   2. ✅ `pnpm db:migrate`（0001，2026-10-06 已执行）；
   3. ✅ `pnpm db:sql supabase/rls.sql`（2026-10-06 已执行，验收全过）；
-  4. ⬜ `node scripts/backfill-tags.ts`（幂等，跑两次核对对账输出）；
+  4. ✅ `node scripts/backfill-tags.ts`（2026-10-06 两遍跑：第二遍零新建、对账一致——posts=2 不变、tags=5、post_tags=6；§13.5 验收通过：标签集合比对 0 不一致、published_at 自查 0 遗漏、幂等成立；**部署前需重跑一次**，因旧代码仍在写旧数组列）；
   5. ⬜ 发布代码（P0+P1+P3）；
   6. ⬜ 验证 `posts.tags` 已冻结不再被写入、§15.1/§15.2/§15.3 验收项。
 

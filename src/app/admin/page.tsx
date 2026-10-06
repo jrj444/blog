@@ -225,9 +225,19 @@ export default async function AdminDashboardPage() {
 
         {/* 标签分布 */}
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm lg:col-span-2 xl:col-span-1">
-          <div className="border-b border-border px-5 py-4">
-            <h2 className="text-sm font-semibold">标签分布</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">当前文章使用的全部标签</p>
+          <div className="flex items-center justify-between border-b border-border px-5 py-4">
+            <div>
+              <h2 className="text-sm font-semibold">标签分布</h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                点击标签查看使用统计与 12 个月趋势
+              </p>
+            </div>
+            <Link
+              href="/admin/tags"
+              className="shrink-0 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              标签管理 →
+            </Link>
           </div>
           <div className="flex min-h-[148px] flex-wrap content-start gap-2 p-5">
             {tags.length === 0 ? (
@@ -236,7 +246,8 @@ export default async function AdminDashboardPage() {
               tags.map((tag) => (
                 <Link
                   key={tag.id}
-                  href={"/tags/" + encodeURIComponent(tag.slug)}
+                  href={`/admin/tags/${tag.id}`}
+                  title={tag.description ?? undefined}
                   className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/35 px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-foreground/20 hover:text-foreground"
                 >
                   <span>#{tag.name}</span>

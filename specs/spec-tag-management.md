@@ -1,11 +1,17 @@
-# 标签管理体系 Spec v1.5
+# 标签管理体系 Spec v1.6
 
-> 状态：Draft v1.5（评审修订版，待确认）  
-> 日期：2026-09-23  
+> 状态：Draft v1.6（评审修订版，待确认）  
+> 日期：2026-10-06（v1.6 复核）；2026-09-23（v1.5 评审）  
 > 关联文档：`specs/spec-jiangruijians-blog.md`  
 > 目标：将标签从 `posts.tags text[]` 中独立出来，提供标签重命名、停用、趋势统计和防重复能力。
 >
 > **核心需求（v1.5 确认）**：当前标签是纯手输文本，难以管理和统计。文章编辑页必须支持「下拉选择已有标签；下拉里没有就手输新名称创建；服务端归一化去重后自动写入标签库」，其余能力（标签管理、文章数/最近使用统计、12 个月趋势）按本文档执行。
+>
+> **v1.6 修订摘要（相对 v1.5，2026-10-06 复核）**
+>
+> - 澄清发布批次：硬切发布 = **P0 + P1 + P3**；P2（后台标签管理）与 P4 等切读观察期（建议一周）结束后再发布。修复 v1.5 中「P0–P3 合并一次发布」与「切读与 P2 不同批」的自相矛盾（§13.3、§16、§17.1、§18）。
+> - 补录统计口径遗漏：后台仪表盘 `getDashboardStats` 的「今年」同样按 `created_at` 统计，引入 `published_at` 后与 `getPublishedStats` 一并改口径（§3、§5.3、§11.1、§18）。
+> - §20.4 增补四条实现注意事项（缓存边界禁 Map、`ON CONFLICT` 单目标、slug 截断尾部 `-`、`tags_active_idx` 暂不建）；P3 完成标准补「发布时间」字段（§16）。
 >
 > **v1.5 修订摘要（相对 v1.4）**
 >
@@ -118,7 +124,7 @@ posts
 5. slug 与名称耦合，改名会改变 URL。
 6. 没有 `published_at`，无法按发布时间统计趋势。
 7. `posts.views` 只有累计值，无法还原历史阅读趋势。
-8. 统计口径不统一：`getPublishedStats` 的「今年」按 `created_at` 统计（`src/lib/db/queries.ts:501`），引入 `published_at` 后需要统一。
+8. 统计口径不统一：`getPublishedStats` 的「今年」按 `created_at` 统计（`src/lib/db/queries.ts:501`），后台仪表盘 `getDashboardStats` 同样按 `created_at` 统计（`src/lib/db/queries.ts:219`）；引入 `published_at` 后需要一并统一。
 
 ---
 
@@ -230,7 +236,7 @@ select count(*) from posts where published = true and published_at is null;  -- 
 说明：
 
 - 对应 §4.2 不变量 9（强制层级：应用层）。
-- 统计口径统一：`getPublishedStats` 的「今年」当前按 `created_at` 统计（`src/lib/db/queries.ts:501`），引入 `published_at` 后一并改按 `published_at`，否则两处口径不一致。
+- 统计口径统一：`getPublishedStats`（`src/lib/db/queries.ts:501`）与后台仪表盘 `getDashboardStats`（`src/lib/db/queries.ts:219`）的「今年」当前都按 `created_at` 统计，引入 `published_at` 后一并改按 `published_at`，否则前台与后台口径不一致。
 
 ### 5.4 旧字段
 
@@ -647,6 +653,7 @@ type PostTagInput = { id?: string; name?: string };
 | `src/lib/db/queries.ts:188` | `getPostById` 返回 `Post`（tags 为 `string[]`） | join 关系表返回 `TagOption[]`（含停用标签，供回显） |
 | `src/lib/db/queries.ts:421` | `getPublishedPostBySlug` 返回 `Post`（tags 为 `string[]`） | join 关系表返回 `TagSummary[]`（仅启用标签） |
 | `src/lib/db/queries.ts:390` | `searchPublishedPosts` 经 `listColumns` 带出 tags | 随 `listColumns` 一起改为 `TagSummary[]` |
+| `src/lib/db/queries.ts:219` | `getDashboardStats` 的 thisYear 按 `createdAt` 统计 | 改按 `published_at`（§5.3 口径统一；后台查询不缓存，无缓存边界问题） |
 | `src/lib/validators/post.ts:11` | `tags: z.array(z.string()...)` | 改为 §8.2 的 `PostTagInput` union；新增 `publishedAt`（空字符串或合法时间，§5.3） |
 | `src/app/admin/posts/actions.ts:44-48` | `parseForm` 内 `.split(",")` | 解析 JSON 隐藏字段（保留逗号兼容分支，§8.2 过渡期）；解析 `publishedAt` 并按 `Asia/Shanghai` 转成时间（§5.3） |
 
@@ -663,7 +670,7 @@ rg -n "tags: string\[\]" src/
 
 白名单只有两处：`src/lib/db/schema.ts`（列定义，P5 删除）与 `scripts/backfill-tags.ts`（一次性回填脚本）。
 
-注意：`getPublishedStats`（`queries.ts:496-516`）改用 `published_at` 后同样要处理缓存边界（现返回 ISO 字符串，保持一致即可）。
+注意：`getPublishedStats`（`queries.ts:496-516`）改用 `published_at` 后同样要处理缓存边界（现返回 ISO 字符串，保持一致即可）；`getDashboardStats`（`queries.ts:211-233`）不缓存，直接改 SQL 即可。
 
 ---
 
@@ -918,17 +925,17 @@ create index posts_published_at_idx on posts (published, published_at);
 | P0 | 表结构迁移（`tags` / `post_tags` / `published_at`）、回填、写路径改造：`parseForm` / validator 改收 `PostTagInput[]`（保留逗号兼容）、`createPost` / `updatePost` 写 `published_at`（表单值，留空填 `now()`）+ 写 `post_tags`（不再写 `posts.tags`） | 数据完整、回填幂等、旧代码仍可运行；发布/编辑/撤稿重发均正常（此阶段表单还没有时间字段，一律按 `now()` 写，P3 接上可编辑字段）；§15.4 的归一化 / slug / 去重单测通过（`pnpm test`） |
 | P1 | 数据访问层、前台标签页和组件改造 | 前台无回归，旧 URL 可解析，§11.1 的机检断言只剩白名单 |
 | P2 | 后台 CRUD、重命名、停用 | 标签可完整管理，停用不影响旧文章保存，启用可逆 |
-| P3 | 文章编辑器标签选择（下拉 + 手输创建） | 新文章不再产生标签变体；手输新标签自动入库并可立即复用 |
+| P3 | 文章编辑器标签选择（下拉 + 手输创建）+「发布时间」`datetime-local` 字段（§5.3） | 新文章不再产生标签变体；手输新标签自动入库并可立即复用；发布时间可编辑，发布时留空自动填 `now()` |
 | P4 | 统计与 12 个月趋势 | 趋势和阅读量快照可查看，时区边界用例通过 |
 | P5 | 删除旧数组和文档同步 | 主 SPEC / README / DEPLOY 更新完成，schema 无漂移 |
 
-P0、P1 完成后才能切换生产；P5 最后执行。
+P0、P1、P3 合并为一次切读发布（§17.1）；P2、P4 在切读观察期（建议一周，§13.3）结束后发布；P5 最后执行。
 
 **全程禁止 `pnpm db:push`**（原因见 §13.6）：只走 `pnpm db:generate` + `pnpm db:migrate`。P0 的建表与加列都用这两条命令完成。
 
 若 P0 与 P1 分两次发布，中间存在时间窗：此期间旧代码仍在写 `posts.tags`，且旧代码发布的文章不带 `published_at`。切读（P1）前需重跑一次回填脚本（幂等，见 §13 方案落点与 §13.5）补齐这两类增量——脚本按 `published_at is null` 补发布时间（§13.2 规则 8）。
 
-按 §17.1 的硬切方案把 P0–P3 合并成一次发布时，这个窗口不存在；但仍建议切读前重跑一次回填（成本极低），并在切读后确认 `posts.tags` 已冻结、不再被写入（§13.3）。
+按 §17.1 的硬切方案把 P0 + P1 + P3 合并成一次发布时，这个窗口不存在；但仍建议切读前重跑一次回填（成本极低），并在切读后确认 `posts.tags` 已冻结、不再被写入（§13.3）。
 
 ---
 
@@ -943,12 +950,12 @@ P0、P1 完成后才能切换生产；P5 最后执行。
 
 ### 17.1 硬切方案（已采用）
 
-v1.5 已确认：把 P0–P3 合并为一次低峰发布、**不保留双写**（§13.3）。理由：站点体量小、只有一个作者，双写带来的过渡逻辑与"改名后数组不再一致"的隐患，比它买到的那点回滚能力更贵。
+v1.5 已确认**不保留双写**；v1.6 澄清批次：**P0 + P1 + P3 合并为一次低峰发布完成切读**，P2（后台标签管理）与 P4 在观察期后单独发布。理由：站点体量小、只有一个作者，双写带来的过渡逻辑与"改名后数组不再一致"的隐患，比它买到的那点回滚能力更贵。
 
 配套纪律：
 
 - 切读前必须先备份（§17）。
-- 切读与 P2（后台标签管理，会开始改标签名）**不要放在同一次发布**，中间留观察期（§13.3）。
+- **P2 不与切读同批**：P2 一上线就会开始改标签名，前台展示立刻变化，与切读的风险叠加不好排查；等观察期（建议一周，§13.3）结束再发。
 - 切读上线后只**向前修**，不再尝试回退到数组模式。
 
 ---
@@ -963,9 +970,9 @@ v1.5 已确认：把 P0–P3 合并为一次低峰发布、**不保留双写**�
 - `published_at` 由应用层写值（表单值；发布时留空则 `now()`），**不加数据库 CHECK、不引入触发器**（§5.3）。
 - 发布时间在后台表单开放编辑、新建默认 `now()`，不再有「首次发布时间冻结」语义（§5.3）。
 - `post_tags.created_at` 保持「首次关联时间」语义：保存文章按差异更新（diff），不做全删重建（§5.2、§8.2 规则 4）。
-- 采用**硬切、不双写**：P0–P3 合并为一次低峰发布，切读前备份，切读与 P2 之间留观察期，回滚靠备份或向前修（§13.3、§17.1）。
+- 采用**硬切、不双写**：P0 + P1 + P3 合并为一次低峰发布，切读前备份；P2 与 P4 等观察期结束再发布；回滚靠备份或向前修（§13.3、§17.1）。
 - 引入 **Vitest** 承载 §6 的单测：`package.json` 加 `pnpm test`，测试文件与模块同目录、相对路径 import，不需要配置文件（§15.4）。
-- `getPublishedStats` 的「今年」统一按 `published_at` 统计（会改变现有数字，接受；§5.3、§10）。
+- `getPublishedStats` 与 `getDashboardStats` 的「今年」统一按 `published_at` 统计（会改变现有数字，接受；§5.3、§11.1）。
 - 从 `package.json` **删除** `db:push` 脚本，README / DEPLOY 同步移除（§13.6）。
 
 其余已定稿的设计点（如有异议请指出）：
@@ -981,7 +988,7 @@ v1.5 已确认：把 P0–P3 合并为一次低峰发布、**不保留双写**�
 9. 停用标签：允许保留既有文章的关联，禁止新增关联（§7.5 / §8.2）。
 10. 旧名称被其他标签复用后，旧链接指向新标签（内容漂移）；V1 不做检测（§6.3）。
 
-至此 v1.5 的评审确认点全部关闭，可进入实施（§16 的 P0）。
+至此评审确认点全部关闭（v1.5 于 2026-09-23，v1.6 修订于 2026-10-06），可继续实施（§16、§20）。
 
 ---
 
@@ -996,4 +1003,51 @@ v1.5 已确认：把 P0–P3 合并为一次低峰发布、**不保留双写**�
 - `DEPLOY.md` 的迁移流程说明（`db:push` 已在 v1.5 提交时改为 `db:generate` + `db:migrate`，见 §13.6）。
 - 迁移、RLS 和索引记录（含 `posts_tags_gin` 的移除；`published_at` 无数据库约束，见 §5.3）。
 
-本 SPEC 评审通过前，不修改主 SPEC 和业务代码。
+本 SPEC 已于 2026-09-23 评审通过（v1.5），2026-10-06 复核修订（v1.6）；实施按 §16 的阶段与 §20 的进度推进。
+
+---
+
+## 20. 实施进度
+
+> **用法**：这里记录「实际写到哪了」。隔几天回来接着写时，先看 §20.1 的当前切片，再看 §20.2 的已完成项。
+> **工作方式（v1.5 约定）**：按切片推进，每片 5–20 行代码 + **一次可运行的验证**；不留「写了一半」的代码。
+> **同步约定**：每完成一个切片，更新 §20.1 的状态与 §20.2 的记录（含日期）；spec 与实现分开提交。
+
+### 20.1 当前阶段：P0-① 归一化与 slug（进行中）
+
+| # | 切片 | 验证点（必须跑） | 状态 |
+| --- | --- | --- | --- |
+| 1 | 装 Vitest + 第一条最小测试 | `pnpm test` → `Tests 1 passed` | ✅ 2026-09-24 完成 |
+| 2 | `normalizeTagName` 的 NFKC / 全角空格断言（并把首条用例的尾部空白补回去） | `pnpm test` 绿；反向实验（去掉 `NFKC`）能变红 | 🟡 进行中 |
+| 3 | `normalizeTagKey` 的断言 | `pnpm test` 绿 → `src/lib/tags/normalize.ts` 完成 | ⬜ |
+| 4 | `slugifyTagName` 的断言 | `pnpm test` 绿 | ⬜ |
+| 5 | `withTagSlugSuffix`（含 60 截断） | `pnpm test` 绿 | ⬜ |
+| 6 | `buildTagSlug`（随机兜底 + 超长截断） | `pnpm test` 绿 | ⬜ |
+| 7 | `normalizeManualTagSlug`（两个抛错） | `pnpm test` 绿 → `src/lib/tags/slug.ts` 完成 | ⬜ |
+| 8 | `pnpm format` + `pnpm typecheck` + 提交 | 三绿 + 1 commit | ⬜ |
+
+### 20.2 已完成
+
+- **2026-09-23** spec v1.5 定稿并提交（`bb99106`）：删除 `db:push` 脚本，README / DEPLOY 同步。
+- **2026-09-24** 工具链就绪：`vitest@5.0.1` 写入 devDependencies；`package.json` 增加 `test` / `test:watch`；新增 `.editorconfig` 与 `.vscode/settings.json`（2 空格缩进、保存即 Prettier 格式化）——从根上解决缩进漂移，比手动改格式更好。
+- **2026-09-24** 第 1 片完成：`src/lib/tags/normalize.ts` 首版（NFKC → trim → 空白折叠）+ `normalize.test.ts` 首条用例，`pnpm test` → `Tests 1 passed`；`src/lib/tags/` 通过 `prettier --check`。
+- **2026-10-06** spec v1.6 复核修订：澄清发布批次（切读 = P0+P1+P3，P2/P4 观察期后单独发布）、补录 `getDashboardStats` 的「今年」口径、§20.4 增补实现注意事项。
+
+### 20.3 待办（P0 其余，按顺序推进）
+
+- **P0-②** `src/lib/db/schema.ts`：`tags` / `post_tags` / `posts.published_at` → `pnpm db:generate`（**只生成迁移文件，先不执行**）。
+- **P0-③** `supabase/rls.sql`：`tags` / `post_tags` 的 RLS、策略与索引。
+- **P0-④** `scripts/backfill-tags.ts`：回填 + §13.2 的自查 SQL。
+- **P0-⑤** 写路径：`createPost` / `updatePost` 的事务 + 去重 + 并发（§8.2 规则 4、7）。
+- P1 及以后见 §16 的阶段表。
+
+### 20.4 实施约定
+
+- 提交信息沿用仓库习惯：`feat(tags): …` / `test(tags): …` / `chore: …`。
+- 每一片的「验证点」没跑绿，不进入下一片。
+- 报错先自己完整读一遍再往下走（读错误信息是核心技能）。
+- 每片结束时三件事一起跑：`pnpm test` + `pnpm typecheck` + `pnpm format`。
+- **缓存边界禁 Map**（§10、§11）：跨 `unstable_cache` 边界的返回值只用原始类型和普通对象——`Map` 序列化后变 `{}`；`listPostTags` 返回 `Array<{ postId, tags }>` 之类结构，时间字段沿用 ISO 字符串约定。
+- **并发创建标签**（§8.2 规则 7）：一条 INSERT 只能有一个 `ON CONFLICT` 子句——用不带 target 的 `on conflict do nothing`（同时覆盖 `normalized_key` 与 `slug` 两个唯一约束），随后按 `normalized_key` 重查：查到行 = 复用已有标签；查不到 = slug 被占，重新生成再试（设上限，如 5 次）。
+- **slug 截断**（§6.2）：按 `60 - suffix.length` 截断后，若基础串以 `-` 结尾要再 strip 一次，避免拼出 `xxx--2`。
+- **`tags_active_idx` 不建**（§14）：V1 先不加 is_active 索引，§14 SQL 块里的那行不要照抄。

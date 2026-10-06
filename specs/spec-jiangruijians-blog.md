@@ -67,7 +67,11 @@ jiangruijians-blog/
 │   │   │   ├── posts/page.tsx            # 文章管理表格 + 删除
 │   │   │   ├── posts/new/page.tsx        # 新建
 │   │   │   ├── posts/[id]/page.tsx       # 编辑
-│   │   │   └── posts/actions.ts          # Server Actions + zod 校验
+│   │   │   ├── posts/actions.ts          # 文章 Server Actions + zod 校验
+│   │   │   ├── tags/page.tsx             # 标签管理（KPI / 搜索 / 筛选 / 列表）
+│   │   │   ├── tags/new/page.tsx         # 新建标签
+│   │   │   ├── tags/[id]/page.tsx        # 编辑 + 使用统计 + 12 个月趋势
+│   │   │   └── tags/actions.ts           # 标签 Server Actions（updateTag 立即失效）
 │   │   ├── auth/signin/page.tsx          # 登录引导页
 │   │   ├── auth/callback/page.tsx        # OAuth 回调页
 │   │   ├── api/auth/[...nextauth]/route.ts
@@ -77,16 +81,18 @@ jiangruijians-blog/
 │   ├── components/
 │   │   ├── ui/                           # shadcn/ui
 │   │   ├── blog/                         # markdown / post-card / pagination / tag-badge / view-tracker / nav-links
-│   │   ├── admin/                        # post-editor / post-form / delete-post-button / mdx-editor
+│   │   ├── admin/                        # post-editor / post-form / tag-select / tag-form / delete-*-button
 │   │   └── auth/                         # sign-in-button
 │   ├── lib/
 │   │   ├── db/ {index, schema, queries}.ts  # Drizzle 客户端 + 表结构 + 查询
-│   │   ├── validators/post.ts            # zod 校验 + slugify
+│   │   ├── tags/ {normalize, slug}.ts       # 标签归一化与 slug 生成（纯函数，脚本复用）
+│   │   ├── validators/ {post, tag}.ts       # zod 校验 + slugify
 │   │   └── site.ts / utils.ts / format-date.ts
 │   ├── auth.ts                           # NextAuth 配置 + isAdmin()
 │   ├── proxy.ts                          # Next 16 中间件（乐观保护 /admin）
 │   └── instrumentation.ts                # 设置全局代理（HTTPS_PROXY）
-├── drizzle/                              # 迁移文件（0000_condemned_gorgon.sql + meta）
+├── drizzle/                              # 迁移文件（0000 建表 / 0001 标签体系 / 0002 删旧数组列）
+├── scripts/                              # backup-data / execute-sql / 已退役的 backfill-tags
 ├── supabase/rls.sql                      # 索引 / RLS / RPC（increment_post_views）
 ├── drizzle.config.ts
 ├── .env.local（gitignore）
@@ -99,20 +105,23 @@ jiangruijians-blog/
 
 ### 5.1 表（Drizzle schema）
 
-仅有：`posts` + `settings`。
+`posts` + `settings` + `tags` + `post_tags`（标签体系 2026-10 落地，详见 `specs/spec-tag-management.md`）。
 
-- `posts(id, slug unique, title, excerpt, content_md, cover_image, tags text[], published bool, views int, created_at, updated_at)`
+- `posts(id, slug unique, title, excerpt, content_md, cover_image, published bool, published_at timestamptz, views int, created_at, updated_at)`
 - `settings(key text pk, value jsonb)`
+- `tags(id, name, normalized_key unique, slug unique, description, is_active bool, created_at, updated_at)`
+- `post_tags(post_id, tag_id, position, created_at)`——联合主键；文章删除级联、标签删除受限
+- 旧 `posts.tags` 数组列已删除（0002 迁移），标签一律走关系表
 
 > **说明**：原 spec 的 `profiles`、`comments`、`embedding`、`article_chunks` **均未建**。
-> `settings` 表在 schema 中已定义，但代码里**尚未使用**（管理员身份走 `ADMIN_EMAILS` 环境变量，空表保留备用）。`posts` 也**没有 `embedding` 向量列**（AI/RAG 延后）。
+> `settings` 表在 schema 中已定义，但代码里**尚未使用**（管理员身份走 `ADMIN_EMAILS` 环境变量，空表保留备用）。`posts` 也**没有 `embedding` 向量列**（AI/RAG 延后）。`published_at` 为纯应用层保证（发布时留空填 `now()`，无数据库约束）。
 
 ### 5.2 RLS + 关键 SQL（supabase/rls.sql，已就位）
 
 - `create extension if not exists pg_trgm;`
-- 模糊检索索引：`posts_title_trgm`、`posts_content_trgm`（gin + trgm_ops）；标签 `posts_tags_gin`（gin tags）
+- 模糊检索索引：`posts_title_trgm`、`posts_content_trgm`（gin + trgm_ops）；标签索引 `post_tags_tag_id_idx`、`posts_published_at_idx`（旧 `posts_tags_gin` 随数组列删除，2026-10）
 - 阅读量：`increment_post_views(post_id uuid)` —— `security definer` 原子自增，仅对已发布文章生效
-- RLS：`posts`、`settings` 开启 RLS；仅"已发布文章公开可读"策略（`posts_public_read` 用 `published = true`）
+- RLS：`posts`、`settings`、`tags`、`post_tags` 开启 RLS；公开读策略仅两条——`posts_public_read`（`published = true`）与 `tags_public_read`（`is_active = true`）；`post_tags` 无策略（不开放匿名读）
 - 读写都走服务端（Drizzle 直连用户为表 owner，绕过 RLS），写权限由 NextAuth + Server Action 在应用层保证；未创建任何写策略（非 owner 一律拒绝）
 
 > 职责分工：**表结构由 Drizzle 迁移管理**（`pnpm db:migrate`），**RLS/索引/触发器/RPC 用 SQL 脚本**（`supabase/rls.sql`）。
@@ -129,7 +138,7 @@ jiangruijians-blog/
 | 操作                      | 方式                                                 |
 | ------------------------- | ---------------------------------------------------- |
 | 读列表/详情/标签          | Server Component 直连 Drizzle（`dynamic = "force-dynamic"`，构建期不访问数据库） |
-| 增删改                    | Server Actions（`/admin/posts/actions.ts`，zod 校验） |
+| 增删改                    | Server Actions（`/admin/posts/actions.ts`、`/admin/tags/actions.ts`，zod 校验；文章标签在事务内按 diff 写 `post_tags`） |
 | 阅读量                    | 客户端 `view-tracker.tsx` → RPC `increment_post_views` |
 | 评论发表                  | **未做**；后续走 Giscus（第三方组件）                  |
 | 评论实时                  | **未做**（无 Supabase Realtime）                      |
@@ -196,7 +205,7 @@ ADMIN_EMAILS=
 | S4   | Auth（GitHub OAuth）+ proxy.ts + admin                 | ✅ 已完成（Auth.js v5 + `ADMIN_EMAILS` 白名单 + `src/proxy.ts` + instrumentation 代理 + 重试）                       |
 | S5   | 文章 CRUD + 后台编辑器                                 | ✅ 已完成（CRUD + zod + slug 唯一化 + @mdxeditor 动态加载；后台表格列表 + 删除二次确认；封面图支持 URL 或上传（R2 直传，2026-09-13）） |
 | S6   | 前台列表/详情 + Markdown 渲染                          | ✅ 已完成（列表/详情 + react-markdown + remark-gfm + rehype-pretty-code 代码高亮）                                   |
-| S7   | 标签/搜索/分页/阅读量/评论                             | ⚠️ 大部分完成（标签聚合/关键词搜索/分页/阅读量已做；**评论未做，Giscus 尚未接入**）                                  |
+| S7   | 标签/搜索/分页/阅读量/评论                             | ⚠️ 大部分完成（标签体系 v1 完成于 2026-10：关系表 + slug + 后台管理 + 统计趋势；关键词搜索/分页/阅读量已做；**评论未做，Giscus 尚未接入**）                                  |
 | S8   | SEO / RSS / 关于页                                     | ✅ 已完成（页面级 metadata + sitemap / robots / `/feed.xml` + 关于页，其中关于页为 2026-09-13 补齐）                                            |
 | S9   | AI 摘要/标签/RAG                                       | ⏸ 延后（无 AI 依赖、无 `api/ai/*`、无 embedding 列）                                                                |
 | S10  | Vercel 部署 + 域名                                     | ✅ 已完成（Vercel + Cloudflare 上线，线上 www.jiangruijian.com；README 已于 2026-09-13 重写）                                                  |
@@ -207,11 +216,11 @@ ADMIN_EMAILS=
 - **AI**：整体延后。未建 `embedding`/`article_chunks`，无 `api/ai/*`，`package.json` 无 AI 依赖。
 - **评论**：**尚未实现**，规划走 Giscus（第三方）；未建自建 `comments` 表，也未接入 Giscus 组件。
 - **路由**：`(admin)` 路由组改为字面量 **`admin/`**，后台路径为 `/admin`；RSS 实际在 `/feed.xml`。
-- **数据库表**：实际为 `posts` + `settings`（无 `profiles`/`comments`）。`settings` 表已定义但**代码未使用**（管理员身份走环境变量）。
-- **RLS**：改为"**已发布文章公开可读** + 服务端表 owner 绕过 RLS"；仅 `posts`/`settings` 开启 RLS，未建写策略；写权限由 NextAuth + Server Action 保证。
+- **数据库表**：`posts` + `settings` + `tags` + `post_tags`（无 `profiles`/`comments`）。`settings` 表已定义但**代码未使用**（管理员身份走环境变量）。标签原为 `posts.tags` 数组列，2026-10 迁移为关系表并删除数组列（详见 `specs/spec-tag-management.md`）。
+- **RLS**：改为"**已发布文章公开可读** + 服务端表 owner 绕过 RLS"；`posts`/`settings`/`tags`/`post_tags` 开启 RLS，公开读仅两条策略，未建写策略；写权限由 NextAuth + Server Action 保证。
 - **代理**：`src/instrumentation.ts` 设置全局 undici 代理（读 `HTTPS_PROXY`/`HTTP_PROXY`），`src/auth.ts` 加 `customFetch` 重试。
 - **封面图**：表单支持「手填 URL」与「本地上传」两种方式；上传走 **Cloudflare R2**（`cdn.jiangruijian.com`）：浏览器端压缩转 WebP → 服务端 `isAdmin()` 校验后签发预签名 PUT → 直传 R2（`Cache-Control: public, max-age=31536000, immutable`）。前台列表缩略图、文章头图、OG 图均已接入。（2026-09-13 更新）
-- **后台仪表盘**：已实做（已发布 / 草稿 / 今年 / 总阅读量 KPI + 最近更新 + 标签分布 + 快捷入口）；仍缺阅读量趋势图。
+- **后台仪表盘**：已实做（已发布 / 草稿 / 今年 / 总阅读量 KPI + 最近更新 + 标签分布[点击直达后台标签详情] + 快捷入口）；「今年」口径按 `published_at` 统计，与前台一致（2026-10）；标签级 12 个月趋势在标签详情页。
 - **依赖清理**：`@supabase/supabase-js` 已安装但**未被代码引用**（未建 `lib/supabase/*`），可后续清理。
 - **种子数据**：暂无 seed 脚本（`package.json` 无 `db:seed`，仓库内无 `scripts/`），需手工建档或后续补充。
 
@@ -231,6 +240,8 @@ ADMIN_EMAILS=
 
 **2026-09-13 已完成**：Vercel + 自定义域名上线验证；数据库连接池抗抖动（keep_alive / 连接池单例 / 只读查询重试）；登录后回跳原页面 + 开放重定向修复；关于页补齐；阅读量 RPC 执行权限收紧。
 
+**2026-10-06 已完成**：标签体系 v1 全量落地（关系表迁移与回填 / 归一化与 slug / 编辑器标签选择 / 后台标签管理 / 12 个月趋势 / 旧数组列删除），实施过程与验收详见 `specs/spec-tag-management.md` §20。
+
 ## 12. 待定 / 需讨论的点
 
 > 已解决（不再列为待定）：后台编辑器（已用 @mdxeditor）、搜索（已用 pg_trgm 关键词搜索）、种子数据（暂无，建议后续补）。
@@ -239,5 +250,5 @@ ADMIN_EMAILS=
 1. **评论**：Giscus 的 repo 用哪个（建议独立仓库 `jiangruijian/blog-comments`）？是否要暗色模式适配？
 2. **AI 优先级**：摘要 / 标签推荐 / RAG 问答，先做哪个？embedding 用通义还是 OpenAI？pgvector 维度何时定稿（定好勿改）。
 3. **多语言**：博客是纯中文，还是要中英文切换（i18n）？
-4. **后台仪表盘**：基础统计已做（KPI / 最近更新 / 标签分布）；是否再加阅读量趋势图，用 `recharts` 还是 `@tremor/react`？
+4. **后台仪表盘**：基础统计已做；标签级 12 个月趋势已在标签详情页实现（纯 CSS 条形图，无图表库）。站点级阅读量趋势是否要做、要不要引入图表库（`recharts` / `@tremor/react`），再议。
 5. **封面图**：已接 R2 直传 + 客户端压缩；是否需要水印、多图、边缘裁剪（Cloudflare Images 付费项）再议。

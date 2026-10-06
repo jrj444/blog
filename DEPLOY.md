@@ -124,5 +124,5 @@ https://jiangruijian.com/api/auth/callback/github
 
 - **`AUTH_SECRET`**：本地那份不要直接拿到生产，重新生成一个。
 - **大陆访问**：Vercel 的 `*.vercel.app` 默认域名在大陆常被阻断；走 Cloudflare 代理后一般可访问，但 Cloudflare 免费版没有中国大陆节点，速度一般。若主要面向大陆且在意延迟，考虑选离你更近的托管/区域。
-- **数据库迁移**：表结构变更用 `pnpm db:generate` 生成、`pnpm db:migrate` 执行，走直连 `DATABASE_URL`(5432)；线上只依赖连接池。**不要用 `drizzle-kit push`**——它会静默删除 RLS、策略、手写索引等对象（实测记录见 `specs/spec-tag-management.md` §13.6）。
+- **数据库迁移**：表结构变更用 `pnpm db:generate` 生成、`pnpm db:migrate` 执行，走直连 `DATABASE_URL`(5432)；线上只依赖连接池。**先部署引用新结构的代码，再执行删列 / 删表类破坏性迁移**——旧构建在编译期绑定了旧列名，顺序颠倒会让线上全站 500。SQL 脚本（索引 / RLS）用 `pnpm db:sql supabase/rls.sql` 执行；迁移前用 `pnpm db:backup` 备份（产物在 gitignore 的 `backups/`，自带回灌校验）。**不要用 `drizzle-kit push`**——它会静默删除 RLS、策略、手写索引等对象（实测记录见 `specs/spec-tag-management.md` §13.6）。
 - **连接池**：Supabase 连接池(6543) + `prepare: false` 已为 serverless 优化，无需改动。

@@ -1,6 +1,9 @@
 /**
  * 标签数据回填（spec-tag-management §13.2）。
  *
+ * 【已退役 · 2026-10-06】P5 删除 posts.tags 列后本脚本不可再运行（读不到源数据），
+ * 保留作一次性迁移的历史记录。回滚场景请用 backups/ 下的备份脚本产物（§17）。
+ *
  * 用法：node scripts/backfill-tags.ts
  *
  * - 从 posts.tags text[] 读取全部旧标签，归一化合并变体后写入 tags / post_tags。

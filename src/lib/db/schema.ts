@@ -11,7 +11,8 @@ import {
   primaryKey,
 } from "drizzle-orm/pg-core";
 
-// 文章正文、标签、封面等全部入库（Markdown），为后续 AI/RAG 铺路。
+// 文章正文、封面、发布时间等全部入库（Markdown），为后续 AI/RAG 铺路。
+// 标签自 2026-10 起在 tags / post_tags 关系表（见下），旧标签数组列已删除。
 export const posts = pgTable(
   "posts",
   {
@@ -21,7 +22,6 @@ export const posts = pgTable(
     excerpt: text("excerpt"),
     contentMd: text("content_md").notNull(),
     coverImage: text("cover_image"),
-    tags: text("tags").array().notNull().default([]),
     published: boolean("published").notNull().default(false),
     // 发布时间：后台表单可编辑，新建默认 now()；发布时留空由服务端填 now()。
     // 纯应用层保证——不加数据库 CHECK / 触发器（spec §5.3），兜底见回填脚本的自查 SQL。

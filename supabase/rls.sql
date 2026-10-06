@@ -25,8 +25,8 @@ create extension if not exists pg_trgm;
 create index if not exists posts_title_trgm on posts using gin (title gin_trgm_ops);
 create index if not exists posts_content_trgm on posts using gin (content_md gin_trgm_ops);
 
--- 标签数组重叠检索
-create index if not exists posts_tags_gin on posts using gin (tags);
+-- （P5 已删）标签数组重叠检索 posts_tags_gin 随 posts.tags 列一并移除；
+-- 标签检索现在走 post_tags_tag_id_idx（见本文件末尾）。
 
 -- 阅读量：security definer 原子自增，仅对已发布文章生效，避免开放 posts.update
 create or replace function public.increment_post_views(post_id uuid)

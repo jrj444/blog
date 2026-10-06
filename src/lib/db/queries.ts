@@ -91,10 +91,10 @@ export type ResolvedTag = TagSummary & { description: string | null; isActive: b
 export type TagSummaryWithCount = TagSummary & { description: string | null; count: number };
 
 /** 文章详情（前台）：tags 只含启用标签 */
-export type PostDetail = Omit<Post, "tags"> & { tags: TagSummary[] };
+export type PostDetail = Post & { tags: TagSummary[] };
 
 /** 文章详情（后台编辑）：tags 含停用标签，供编辑器回显（§8.2 规则 2） */
-export type PostDetailAdmin = Omit<Post, "tags"> & { tags: TagOption[] };
+export type PostDetailAdmin = Post & { tags: TagOption[] };
 
 const MINUTES_PER_CHAR = 350;
 
@@ -239,7 +239,7 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
     return {
       posts: rows.map((row) => ({
         ...row,
-        // 展开覆盖：冻结的旧数组列值与新类型一并替换为关系表数据
+        // 标签来自关系表批量查询（旧标签数组列已随 P5 删除）
         tags: tagsByPost.get(row.id) ?? [],
       })),
       total,

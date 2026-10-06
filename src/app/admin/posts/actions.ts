@@ -66,30 +66,26 @@ function parsePublishedAt(formData: FormData): Date | null | undefined {
 }
 
 /**
- * 标签隐藏字段（§8.2 过渡期）：trim 后以 [ 开头按 JSON 数组解析（新标签选择组件，
- * 元素形如 {id} / {name}）；否则按逗号切分（旧输入框），结果同样转成 [{name}]。
- * 结构合法性交给 zod；解析失败给字段级错误，不得静默丢弃标签。P5 删除逗号分支。
+ * 标签隐藏字段（§8.2）：标签选择组件提交 JSON 数组（元素形如 {id} / {name}）。
+ * 结构合法性交给 zod；解析失败给字段级错误，不得静默丢弃标签。
+ * （P5：旧逗号输入框的兼容分支已随旧标签数组列一并移除。）
  */
 function parseTags(formData: FormData): PostTagInput[] {
   const raw = String(formData.get("tags") ?? "").trim();
   if (raw === "") return [];
-  if (raw.startsWith("[")) {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      throw new FormParseError("tags", "标签数据格式错误，请重新编辑标签");
-    }
-    if (!Array.isArray(parsed)) {
-      throw new FormParseError("tags", "标签数据格式错误，请重新编辑标签");
-    }
-    return parsed as PostTagInput[];
+  if (!raw.startsWith("[")) {
+    throw new FormParseError("tags", "标签数据格式错误，请重新编辑标签");
   }
-  return raw
-    .split(",")
-    .map((t) => t.trim())
-    .filter(Boolean)
-    .map((name) => ({ name }));
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    throw new FormParseError("tags", "标签数据格式错误，请重新编辑标签");
+  }
+  if (!Array.isArray(parsed)) {
+    throw new FormParseError("tags", "标签数据格式错误，请重新编辑标签");
+  }
+  return parsed as PostTagInput[];
 }
 
 // 把表单字段转成 zod 想要的结构；slug 留空则用 slugify(title)，中文标题空串时兜底

@@ -15,6 +15,13 @@
       "when": 1791277190077,
       "tag": "0001_wet_spyke",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791296604856,
+      "tag": "0002_cute_bedlam",
+      "breakpoints": true
     }
   ]
 }

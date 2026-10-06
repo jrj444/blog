@@ -62,3 +62,28 @@ alter table settings enable row level security;
 drop policy if exists "posts_public_read" on posts;
 create policy "posts_public_read" on posts
   for select using (published = true);
+
+-- ------------------------------------------------------------
+-- 标签（tags / post_tags）—— spec-tag-management §12 / §14
+-- 表结构由 Drizzle 迁移创建（drizzle/0001_*.sql，含 normalized_key / slug 的
+-- UNIQUE 约束）；二级索引与 RLS 按分工落在本脚本。
+-- 权限模型与 posts 相同：owner（Drizzle 直连）绕过 RLS，写操作只走服务端
+-- Server Action + isAdmin()；这里只约束非 owner 的公开读，不创建任何写策略。
+-- ------------------------------------------------------------
+alter table tags enable row level security;
+alter table post_tags enable row level security;
+
+-- tags：启用中的标签是公开数据（前台标签云 / 标签页 / sitemap），开放只读；
+-- 停用标签（is_active = false）对匿名不可见。
+drop policy if exists "tags_public_read" on tags;
+create policy "tags_public_read" on tags
+  for select using (is_active = true);
+
+-- post_tags：不创建任何策略 → 非 owner 一律拒绝。
+-- 关联表里包含草稿文章的标签，不开放匿名直读，避免暴露未发布内容（§12）。
+
+-- 标签页 / 计数用：按 tag_id 反查文章（主键只覆盖按 post_id 正查）
+create index if not exists post_tags_tag_id_idx on post_tags (tag_id, post_id);
+
+-- 趋势统计（按 published_at 分月）与发布态过滤
+create index if not exists posts_published_at_idx on posts (published, published_at);

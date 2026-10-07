@@ -34,10 +34,15 @@ const sql = postgres(DATABASE_URL, {
   onnotice: () => {},
 });
 
-/** 备份的表与排序主键：先小表后大表（当前无 FK 依赖，无拓扑要求） */
-const TABLES: { table: string; pk: string }[] = [
-  { table: "settings", pk: "key" },
-  { table: "posts", pk: "id" },
+/**
+ * 备份的表与排序：FK 拓扑序（post_tags 依赖 posts 与 tags，必须排在其后），
+ * 恢复时才能直接执行；排序键为硬编码常量（trusted），支持多列。
+ */
+const TABLES: { table: string; orderBy: string }[] = [
+  { table: "settings", orderBy: "key" },
+  { table: "tags", orderBy: "name" },
+  { table: "posts", orderBy: "id" },
+  { table: "post_tags", orderBy: "post_id, tag_id" },
 ];
 
 interface Column {
@@ -57,7 +62,7 @@ async function main(): Promise<void> {
   let verified = true;
 
   await sql.begin(async (tx) => {
-    for (const { table, pk } of TABLES) {
+    for (const { table, orderBy } of TABLES) {
       const columns = await tx<Column[]>`
         select column_name
         from information_schema.columns
@@ -72,7 +77,7 @@ async function main(): Promise<void> {
       const expr = colNames.map((n) => `quote_nullable(${ident(n)})`).join(` || ', ' || `);
       const generated = await tx.unsafe<[{ stmt: string }]>(
         `select 'insert into ${ident(table)} (${colList}) values (' || ${expr} || ');' as stmt
-         from ${ident(table)} order by ${ident(pk)}`,
+         from ${ident(table)} order by ${orderBy}`,
       );
       const statements = generated.map((row) => row.stmt);
       if (statements.length === 0) {
@@ -89,7 +94,7 @@ async function main(): Promise<void> {
       }
       const digestQuery = (qualified: string) =>
         `select count(*)::int as n,
-                md5(coalesce(string_agg(row_to_json(t)::text, '' order by ${ident(pk)}), '')) as digest
+                md5(coalesce(string_agg(row_to_json(t)::text, '' order by ${orderBy}), '')) as digest
          from ${qualified}${ident(table)} t`;
       const [origin] = await tx.unsafe<[{ n: number; digest: string }]>(digestQuery("public."));
       // 不加 schema 限定：解析到 TEMP 表（遮蔽实体表），才是真正的回灌结果

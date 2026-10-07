@@ -9,7 +9,7 @@ export async function GET() {
 
   const items = posts
     .map((post) => {
-      const link = absUrl(`/posts/${post.slug}`);
+      const link = absUrl(`/posts/${encodeURIComponent(post.slug)}`);
       return `<item>
   <title>${escapeXml(post.title)}</title>
   <link>${escapeXml(link)}</link>

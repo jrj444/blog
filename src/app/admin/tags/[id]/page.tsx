@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { getAdminTagById, listTagMonthlyTrend, listTagUsageStats } from "@/lib/db/queries";
-import { toDatetimeLocal } from "@/lib/format-date";
-import { cn } from "@/lib/utils";
+import { formatDateShort } from "@/lib/format-date";
+import { cn, isUuid } from "@/lib/utils";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { DeleteTagButton } from "@/components/admin/delete-tag-button";
 import { TagForm } from "@/components/admin/tag-form";
@@ -54,6 +54,7 @@ function TrendChart({ points }: { points: { month: string; count: number }[] }) 
 
 export default async function AdminTagDetailPage({ params }: Props) {
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const tag = await getAdminTagById(id);
   if (!tag) notFound();
 
@@ -72,7 +73,7 @@ export default async function AdminTagDetailPage({ params }: Props) {
 
       <AdminPageHeader
         title={`#${tag.name}`}
-        description={`/${tag.slug} · 创建于 ${toDatetimeLocal(tag.createdAt).slice(0, 10)}`}
+        description={`/${tag.slug} · 创建于 ${formatDateShort(tag.createdAt)}`}
         actions={
           <div className="flex items-center gap-3">
             <form action={toggleTagActiveAction.bind(null, tag.id, !tag.isActive)}>
@@ -104,7 +105,7 @@ export default async function AdminTagDetailPage({ params }: Props) {
         <Stat label="累计阅读量" value={stats.totalViews} hint="当前快照，非月度趋势" />
         <Stat
           label="最近使用"
-          value={stats.lastUsedAt ? toDatetimeLocal(stats.lastUsedAt).slice(0, 10) : "—"}
+          value={stats.lastUsedAt ? formatDateShort(stats.lastUsedAt) : "—"}
           hint="已发布文章的最新发布时间"
         />
       </dl>

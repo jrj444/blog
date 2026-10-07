@@ -100,6 +100,11 @@ export async function deleteMediaItemAction(key: string): Promise<{ ok: boolean;
     return { ok: false, error: "无效的对象路径" };
   }
 
+  // 前缀白名单：只允许删除本系统上传的素材，防误删桶内其他对象
+  if (!/^(covers|posts|media)\//.test(key.trim())) {
+    return { ok: false, error: "只允许删除本系统上传的素材" };
+  }
+
   try {
     await deleteObject(key.trim());
     return { ok: true };

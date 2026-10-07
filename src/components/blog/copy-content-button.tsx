@@ -1,14 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, Copy, X } from "lucide-react";
+import { Check, Copy, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type CopyContentButtonProps = {
   /** 文章标题：有值时复制为「# 标题 + 空行 + 正文」 */
   title?: string;
-  /** 要复制的原始内容（Markdown 源文） */
-  content: string;
+  /** 同步内容（短文本场景）；与 fetchContent 二选一 */
+  content?: string;
+  /** 惰性取内容（长文场景：点击时才经 Server Action 取，避免进 RSC payload） */
+  fetchContent?: () => Promise<string | null>;
   label?: string;
   copiedLabel?: string;
   /** link：行内文字样式（后台列表行）；button：描边按钮样式（前台详情页，默认） */
@@ -24,26 +26,31 @@ const STYLES = {
 
 /**
  * 一键复制原始内容（Markdown 源文），前台文章页与后台文章列表共用。
+ * 长文场景传 fetchContent（点击时才取文，payload 不膨胀）；短文本直接传 content。
  * navigator.clipboard 需要安全上下文（https / localhost）；失败给出可感知的
  * 「复制失败」反馈并自动复位，不静默。
  */
 export function CopyContentButton({
   title,
   content,
+  fetchContent,
   label = "复制原文",
   copiedLabel = "已复制",
   variant = "button",
   className,
 }: CopyContentButtonProps) {
-  const [state, setState] = useState<"idle" | "copied" | "error">("idle");
+  const [state, setState] = useState<"idle" | "pending" | "copied" | "error">("idle");
   const timerRef = useRef<number | undefined>(undefined);
-  const copyText = title ? `# ${title}\n\n${content}` : content;
 
   // 卸载时清掉复位定时器，避免对已卸载组件 setState
   useEffect(() => () => window.clearTimeout(timerRef.current), []);
 
   async function handleCopy() {
+    setState("pending");
     try {
+      const body = fetchContent ? await fetchContent() : content;
+      if (!body) throw new Error("no content");
+      const copyText = title ? `# ${title}\n\n${body}` : body;
       await navigator.clipboard.writeText(copyText);
       setState("copied");
     } catch {
@@ -53,7 +60,14 @@ export function CopyContentButton({
     timerRef.current = window.setTimeout(() => setState("idle"), 1600);
   }
 
-  const text = state === "copied" ? copiedLabel : state === "error" ? "复制失败" : label;
+  const text =
+    state === "pending"
+      ? "复制中…"
+      : state === "copied"
+        ? copiedLabel
+        : state === "error"
+          ? "复制失败"
+          : label;
 
   return (
     <button
@@ -62,7 +76,9 @@ export function CopyContentButton({
       aria-live="polite"
       className={cn(STYLES[variant], state === "error" && "text-destructive", className)}
     >
-      {state === "copied" ? (
+      {state === "pending" ? (
+        <Loader2 aria-hidden className="size-3.5 animate-spin" />
+      ) : state === "copied" ? (
         <Check aria-hidden className="size-3.5 text-emerald-600" />
       ) : state === "error" ? (
         <X aria-hidden className="size-3.5" />

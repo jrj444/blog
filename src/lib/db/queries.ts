@@ -20,6 +20,7 @@ import { slugify, type PostInput, type PostTagInput } from "@/lib/validators/pos
 import { normalizeTagKey, normalizeTagName } from "@/lib/tags/normalize";
 import { buildTagSlug, normalizeManualTagSlug, withTagSlugSuffix } from "@/lib/tags/slug";
 import { escapeLike, normalizeSearchTerm } from "@/lib/db/search";
+import { MINUTES_PER_CHAR } from "@/lib/reading-time";
 
 // ---------- 列表投影 ----------
 
@@ -96,9 +97,7 @@ export type PostDetail = Post & { tags: TagSummary[] };
 /** 文章详情（后台编辑）：tags 含停用标签，供编辑器回显（§8.2 规则 2） */
 export type PostDetailAdmin = Post & { tags: TagOption[] };
 
-const MINUTES_PER_CHAR = 350;
-
-/** 与 lib/reading-time.ts 保持一致：不足 1 分钟按 1 分钟计 */
+/** 阅读时长口径统一走 lib/reading-time.ts（SQL 侧 length() 按字符数，与 JS 一致） */
 function toReadingMinutes(charCount: number) {
   return Math.max(1, Math.round(charCount / MINUTES_PER_CHAR));
 }
@@ -202,9 +201,20 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
     // 3) 分页数据 + 当前筛选 total 并发执行（两条查询同时发出，无串行等待）。
     //    使用 Drizzle ORM .select() 而非 db.execute()，确保列名自动映射为 camelCase
     //    （db.execute 返回原始 snake_case 列名，会导致 createdAt 等字段 undefined → Invalid Date）。
+    // 显式投影：content_md 不参与列表渲染（复制按钮点击时经 Server Action 惰性取文）
     const [rows, [{ value: total }]] = await Promise.all([
       db
-        .select()
+        .select({
+          id: posts.id,
+          slug: posts.slug,
+          title: posts.title,
+          excerpt: posts.excerpt,
+          coverImage: posts.coverImage,
+          published: posts.published,
+          views: posts.views,
+          createdAt: posts.createdAt,
+          updatedAt: posts.updatedAt,
+        })
         .from(posts)
         .where(where)
         .orderBy(desc(posts.createdAt))
@@ -213,7 +223,7 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
       db.select({ value: count() }).from(posts).where(where),
     ]);
 
-    // 标签改走关系表批量取（含停用，后台可标注）；旧数组列已冻结不再读取（§13.3）
+    // 标签走关系表批量取（含停用，后台可标注）
     const postIds = rows.map((row) => row.id);
     const tagsByPost = new Map<string, TagOption[]>();
     if (postIds.length > 0) {
@@ -268,14 +278,33 @@ export async function getPostById(id: string): Promise<PostDetailAdmin | undefin
 
 // 后台仪表盘：最近更新的文章（含草稿），按更新时间倒序
 export function listRecentPosts(limit = 5) {
-  return queryWithRetry(() => db.select().from(posts).orderBy(desc(posts.updatedAt)).limit(limit));
+  return queryWithRetry(() =>
+    db
+      .select({
+        id: posts.id,
+        slug: posts.slug,
+        title: posts.title,
+        published: posts.published,
+        views: posts.views,
+        updatedAt: posts.updatedAt,
+      })
+      .from(posts)
+      .orderBy(desc(posts.updatedAt))
+      .limit(limit),
+  );
 }
 
 // 后台仪表盘：阅读量最高的前 N 篇已发布文章
 export function listTopViewedPosts(limit = 5) {
   return queryWithRetry(() =>
     db
-      .select()
+      .select({
+        id: posts.id,
+        slug: posts.slug,
+        title: posts.title,
+        views: posts.views,
+        createdAt: posts.createdAt,
+      })
       .from(posts)
       .where(eq(posts.published, true))
       .orderBy(desc(posts.views), desc(posts.createdAt))
@@ -780,9 +809,44 @@ export const getPublishedStats = cached("published-stats", async () => {
   };
 });
 
-/** sitemap / RSS：全部已发布文章（RSS 需要正文做 content:encoded） */
+/** sitemap 用：只需要 slug 与更新时间，不拉正文 */
+export const allPublishedPostMeta = cached("published-post-meta", () =>
+  db
+    .select({ slug: posts.slug, updatedAt: posts.updatedAt })
+    .from(posts)
+    .where(eq(posts.published, true))
+    .orderBy(desc(posts.createdAt)),
+);
+
+/** RSS：全部已发布文章全文（content:encoded），上限 50 条防超大库拖垮 feed */
 export const allPublishedPosts = cached("all-published", () =>
-  db.select().from(posts).where(eq(posts.published, true)).orderBy(desc(posts.createdAt)),
+  db.select().from(posts).where(eq(posts.published, true)).orderBy(desc(posts.createdAt)).limit(50),
+);
+
+/** 后台复制按钮：惰性取单篇正文（不拉进列表查询与 RSC payload） */
+export async function getPostContentById(id: string): Promise<string | null> {
+  return queryWithRetry(async () => {
+    const [row] = await db
+      .select({ contentMd: posts.contentMd })
+      .from(posts)
+      .where(eq(posts.id, id))
+      .limit(1);
+    return row?.contentMd ?? null;
+  });
+}
+
+/** 前台复制按钮：按 slug 惰性取已发布文章正文（公开数据，走缓存） */
+export const getPublishedPostContentBySlug = cached(
+  "published-post-content-by-slug",
+  (slug: string) =>
+    queryWithRetry(async () => {
+      const [row] = await db
+        .select({ contentMd: posts.contentMd })
+        .from(posts)
+        .where(and(eq(posts.slug, slug), eq(posts.published, true)))
+        .limit(1);
+      return row?.contentMd ?? null;
+    }),
 );
 
 /**

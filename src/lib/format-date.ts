@@ -1,14 +1,29 @@
 /**
  * 把日期格式化为中文格式,如「2026年8月31日」。
  * 可传入 Intl.DateTimeFormatOptions 覆盖默认的年月日格式。
+ *
+ * 固定 Asia/Shanghai：服务器（Vercel）运行在 UTC，不带 timeZone 会让
+ * 北京时间 0:00–8:00 的日期显示成前一天。
  */
 export function formatDate(date: Date | string, options?: Intl.DateTimeFormatOptions): string {
   return new Intl.DateTimeFormat("zh-CN", {
     year: "numeric",
     month: "long",
     day: "numeric",
+    timeZone: "Asia/Shanghai",
     ...options,
   }).format(toDate(date));
+}
+
+/** "YYYY-MM-DD"（Asia/Shanghai）——表格与列表的紧凑日期展示统一走这里 */
+export function formatDateShort(value: Date | string): string {
+  // en-CA 恰好输出 ISO 形式的 YYYY-MM-DD
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(toDate(value));
 }
 
 /**

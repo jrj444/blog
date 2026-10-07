@@ -33,7 +33,7 @@
 | 实时   | **未接入 Supabase Realtime**                     | 评论未做；后续走 Giscus（第三方）                   |
 | AI     | **延后**                                         | 未引入 AI 依赖、无 `api/ai/*`；embedding 模型未定   |
 
-> 注：`package.json` 中仍装有 `@supabase/supabase-js`，但代码里**未实际使用**（无 `lib/supabase/*`，运行时直连 Drizzle + postgres）。可后续清理或留作 Storage 上传用。
+> 注：`@supabase/supabase-js` 已从依赖中移除（2026-10 清理），运行时直连 Drizzle + postgres。
 
 ## 3. 架构决策（已定）
 
@@ -221,8 +221,8 @@ ADMIN_EMAILS=
 - **代理**：`src/instrumentation.ts` 设置全局 undici 代理（读 `HTTPS_PROXY`/`HTTP_PROXY`），`src/auth.ts` 加 `customFetch` 重试。
 - **封面图**：表单支持「手填 URL」与「本地上传」两种方式；上传走 **Cloudflare R2**（`cdn.jiangruijian.com`）：浏览器端压缩转 WebP → 服务端 `isAdmin()` 校验后签发预签名 PUT → 直传 R2（`Cache-Control: public, max-age=31536000, immutable`）。前台列表缩略图、文章头图、OG 图均已接入。（2026-09-13 更新）
 - **后台仪表盘**：已实做（已发布 / 草稿 / 今年 / 总阅读量 KPI + 最近更新 + 标签分布[点击直达后台标签详情] + 快捷入口）；「今年」口径按 `published_at` 统计，与前台一致（2026-10）；标签级 12 个月趋势在标签详情页。
-- **依赖清理**：`@supabase/supabase-js` 已安装但**未被代码引用**（未建 `lib/supabase/*`），可后续清理。
-- **种子数据**：暂无 seed 脚本（`package.json` 无 `db:seed`，仓库内无 `scripts/`），需手工建档或后续补充。
+- **依赖清理**：`@supabase/supabase-js` 已移除（2026-10 核对销账）。`babel-plugin-react-compiler` 亦已移除（reactCompiler 关闭后闲置）。
+- **种子数据**：暂无 seed 脚本（`package.json` 无 `db:seed`）；`scripts/` 现有 backup-data / execute-sql / 已退役的 backfill-tags 三个运维脚本。
 
 ### 当前进度结论（2026-09-13）
 
@@ -236,7 +236,7 @@ ADMIN_EMAILS=
 
 1. **评论**：接入 Giscus（配置 repo/theme 等），并在文章详情页挂载组件。
 2. **AI（延后）**：若启动，需先建 `embedding` 向量列与 `article_chunks`，定 embedding 模型与维度，再加 `api/ai/*`。
-3. **可选**：仪表盘阅读量趋势图、清理未使用的 `@supabase/supabase-js`、写 seed 脚本；阅读量 RPC 已收紧执行权（`revoke execute` from public/anon/authenticated，仅保留 owner 与 service_role）；统一 `SITE_URL` / `AUTH_URL` 与 GitHub OAuth 回调到 www（当前指向 apex，每次 admin 跳转多一次 308，2026-09-13 决定暂缓）。
+3. **可选**：站点级阅读量趋势图、写 seed 脚本；阅读量 RPC 已收紧执行权（`revoke execute` from public/anon/authenticated，仅保留 owner 与 service_role）；统一 `SITE_URL` / `AUTH_URL` 与 GitHub OAuth 回调到 www（当前指向 apex，每次 admin 跳转多一次 308，2026-09-13 决定暂缓）。
 
 **2026-09-13 已完成**：Vercel + 自定义域名上线验证；数据库连接池抗抖动（keep_alive / 连接池单例 / 只读查询重试）；登录后回跳原页面 + 开放重定向修复；关于页补齐；阅读量 RPC 执行权限收紧。
 

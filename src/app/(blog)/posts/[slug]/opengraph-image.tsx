@@ -1,5 +1,5 @@
 import { ImageResponse } from "next/og";
-import { getPublishedPostBySlug } from "@/lib/db/queries";
+import { decodeRouteParam, getPublishedPostBySlug } from "@/lib/db/queries";
 import { siteConfig } from "@/lib/site";
 import { formatDate } from "@/lib/format-date";
 
@@ -14,7 +14,7 @@ type Props = {
 
 export default async function Image({ params }: Props) {
   const { slug } = await params;
-  const post = await getPublishedPostBySlug(slug);
+  const post = await getPublishedPostBySlug(decodeRouteParam(slug));
 
   const title = post?.title ?? siteConfig.name;
   const excerpt = post?.excerpt ?? siteConfig.description;

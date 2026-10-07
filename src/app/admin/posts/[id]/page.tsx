@@ -1,12 +1,15 @@
 import { notFound } from "next/navigation";
 import { getPostById, listPublicTagsWithCountsUncached } from "@/lib/db/queries";
 import { toDatetimeLocal } from "@/lib/format-date";
+import { isUuid } from "@/lib/utils";
 import { updatePostAction } from "../actions";
 import { PostForm } from "@/components/admin/post-form";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 
 export default async function EditPostPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  // 非法 id 直接 404，而不是让数据库 cast 报 500
+  if (!isUuid(id)) notFound();
   // 候选不缓存：编辑器要能看到刚创建的标签（§12）
   const [post, tagOptions] = await Promise.all([
     getPostById(id),

@@ -10,14 +10,18 @@ import { TagBadge } from "@/components/blog/tag-badge";
 import { ViewTracker } from "@/components/blog/view-tracker";
 import { SharePosterButton } from "@/components/blog/share-poster-modal";
 import { CopyContentButton } from "@/components/blog/copy-content-button";
+import { getPostContentBySlug } from "./actions";
 import { formatDate, toIsoString } from "@/lib/format-date";
+import { readingTime } from "@/lib/reading-time";
+import { decodeRouteParam } from "@/lib/db/queries";
 import { siteConfig, absUrl } from "@/lib/site";
 
 // 页面数据来自数据库,每次请求实时渲染(构建期不访问数据库)。
 export const dynamic = "force-dynamic";
 
 // React cache 让 generateMetadata 与页面共用同一次查询结果。
-const getPost = cache(getPublishedPostBySlug);
+// Next 16 的 page params 可能仍是百分号编码（中文 slug 场景，见 decodeRouteParam 注释）
+const getPost = cache((slug: string) => getPublishedPostBySlug(decodeRouteParam(slug)));
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -94,7 +98,8 @@ export default async function PostPage({ params }: Props) {
     <article className="mx-auto max-w-[68rem]">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        // `<` 转义为 \u003c：标题/摘要含 </script> 字样时会截断脚本标签
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
       <div className="mx-auto max-w-3xl xl:mx-0">
         <Link
@@ -156,14 +161,14 @@ export default async function PostPage({ params }: Props) {
                     excerpt: post.excerpt,
                     tags: post.tags,
                     date: formatDate(post.createdAt),
-                    readingMinutes: Math.max(
-                      1,
-                      Math.round(post.contentMd.replace(/\s/g, "").length / 350),
-                    ),
+                    readingMinutes: readingTime(post.contentMd).minutes,
                     url: postUrl,
                   }}
                 />
-                <CopyContentButton title={post.title} content={post.contentMd} />
+                <CopyContentButton
+                  title={post.title}
+                  fetchContent={getPostContentBySlug.bind(null, post.slug)}
+                />
               </div>
               <Link
                 href="/posts"

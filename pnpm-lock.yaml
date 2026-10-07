@@ -117,9 +117,6 @@ importers:
       '@types/react-dom':
         specifier: ^19
         version: 19.2.5(@types/react@19.2.18)
-      babel-plugin-react-compiler:
-        specifier: 1.0.0
-        version: 1.0.0
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
@@ -7270,6 +7267,7 @@ snapshots:
   babel-plugin-react-compiler@1.0.0:
     dependencies:
       '@babel/types': 7.29.8
+    optional: true
 
   bail@2.0.2: {}
 

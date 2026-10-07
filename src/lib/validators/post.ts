@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { slugifyTagName } from "@/lib/tags/slug";
 
 /**
  * 文章表单的标签条目（spec §8.2）：{ id } = 已有标签，{ name } = 待创建名称。
@@ -17,9 +18,11 @@ export const postInputSchema = z.object({
   slug: z
     .string()
     .min(1, "slug 不能为空")
-    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "slug 只能是小写字母、数字和连字符"),
+    .max(100, "slug 过长")
+    // 与 slugifyTagName 输出一致的字符集（Unicode 字母/数字/._-）；连字符规则由 slugify 保证
+    .regex(/^[\p{L}\p{N}._-]+$/u, "slug 只能包含字母、数字、点、下划线和连字符"),
   excerpt: z.string().max(300, "摘要最多 300 字").optional().or(z.literal("")),
-  contentMd: z.string().min(1, "正文不能为空"),
+  contentMd: z.string().min(1, "正文不能为空").max(300_000, "正文过长（上限 30 万字符）"),
   tags: z.array(postTagInputSchema).max(10, "标签最多 10 个"),
   published: z.boolean().default(false),
   // 发布时间（§5.3）：parseForm 已按 Asia/Shanghai 转成 Date。
@@ -37,10 +40,10 @@ export const postInputSchema = z.object({
 export type PostTagInput = z.infer<typeof postTagInputSchema>;
 export type PostInput = z.infer<typeof postInputSchema>;
 
+/**
+ * 文章 slug：复用标签的 Unicode slug 实现（§6.2 同源）——
+ * 中文标题不再得到空串落到 post-xxx 随机兜底。
+ */
 export function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  return slugifyTagName(value);
 }

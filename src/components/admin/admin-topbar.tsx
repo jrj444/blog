@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ExternalLink, Menu, X } from "lucide-react";
+import { ExternalLink, LogOut, Menu, X } from "lucide-react";
+import { signOut } from "next-auth/react";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { AdminSidebarContent } from "./admin-sidebar";
 
@@ -61,6 +62,15 @@ export function AdminTopbar() {
             查看站点
             <ExternalLink aria-hidden className="size-3.5" />
           </Link>
+          <button
+            type="button"
+            onClick={() => void signOut({ redirectTo: "/" })}
+            title="退出登录"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <LogOut aria-hidden className="size-3.5" />
+            <span className="hidden sm:inline">退出</span>
+          </button>
         </div>
       </header>
 

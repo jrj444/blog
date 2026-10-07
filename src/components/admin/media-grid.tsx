@@ -26,6 +26,7 @@ import {
   deleteMediaItemAction,
   listMediaAction,
 } from "@/app/admin/media/actions";
+import { formatDateShort } from "@/lib/format-date";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -52,7 +53,7 @@ function formatDateStr(iso: string): string {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return "未知时间";
-    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+    return formatDateShort(d);
   } catch {
     return "未知时间";
   }
@@ -191,15 +192,19 @@ export function MediaGrid({ initialItems }: { initialItems: StoredMediaItemWithR
     }
   };
 
-  // 复制反馈
-  const handleCopy = (key: string, text: string, type: "md" | "url") => {
-    navigator.clipboard.writeText(text);
-    setCopiedKey(key);
-    setCopiedType(type);
-    setTimeout(() => {
-      setCopiedKey(null);
-      setCopiedType(null);
-    }, 2000);
+  // 复制反馈：await + try/catch，失败给出可感知反馈（此前失败也显示「已复制」）
+  const handleCopy = async (key: string, text: string, type: "md" | "url") => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setCopiedType(type);
+      setTimeout(() => {
+        setCopiedKey(null);
+        setCopiedType(null);
+      }, 2000);
+    } catch {
+      window.alert("复制失败：浏览器未授权剪贴板访问");
+    }
   };
 
   // 执行删除
@@ -478,7 +483,7 @@ export function MediaGrid({ initialItems }: { initialItems: StoredMediaItemWithR
                   <div className="mt-3 flex items-center gap-1.5 border-t border-border/60 pt-2.5">
                     <button
                       type="button"
-                      onClick={() => handleCopy(item.key, mdSyntax, "md")}
+                      onClick={() => void handleCopy(item.key, mdSyntax, "md")}
                       className="flex h-7 flex-1 items-center justify-center gap-1 rounded-md border border-border/80 bg-background/80 px-2 font-mono text-[11px] font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
                       title="复制 Markdown 语法"
                     >
@@ -492,7 +497,7 @@ export function MediaGrid({ initialItems }: { initialItems: StoredMediaItemWithR
 
                     <button
                       type="button"
-                      onClick={() => handleCopy(item.key, item.publicUrl, "url")}
+                      onClick={() => void handleCopy(item.key, item.publicUrl, "url")}
                       className="grid size-7 shrink-0 place-items-center rounded-md border border-border/80 bg-background/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
                       title="复制图片直链 URL"
                     >

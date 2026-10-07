@@ -48,3 +48,6 @@ next-env.d.ts
 
 # 本地数据库备份（免费版 Supabase 用 scripts/backup-data.ts 生成，体积可能很大且含全站内容）
 backups/
+
+# 本地草稿（避免误提交真实文章草稿）
+drafts/

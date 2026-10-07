@@ -1,13 +1,15 @@
 import Link from "next/link";
 import type { PostListItem } from "@/lib/db/queries";
 import { TagBadge } from "@/components/blog/tag-badge";
-import { toDate } from "@/lib/format-date";
+import { toDatetimeLocal } from "@/lib/format-date";
 
+/** 日期块按 Asia/Shanghai 切分（服务器在 UTC，直接 getMonth/getDate 会错一天） */
 function dateParts(date: Date | string) {
-  const d = toDate(date);
-  const day = String(d.getDate()).padStart(2, "0");
-  const my = `${String(d.getMonth() + 1).padStart(2, "0")} / ${d.getFullYear()}`;
-  return { day, my };
+  const local = toDatetimeLocal(date);
+  return {
+    day: local.slice(8, 10),
+    my: `${local.slice(5, 7)} / ${local.slice(0, 4)}`,
+  };
 }
 
 /**

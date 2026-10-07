@@ -1,4 +1,5 @@
 import { listPublishedPosts, getPublishedStats, listPublicTagsWithCounts } from "@/lib/db/queries";
+import { toDatetimeLocal } from "@/lib/format-date";
 import { HomeFeed } from "@/components/blog/home-feed";
 import { Reveal } from "@/components/blog/reveal";
 
@@ -20,12 +21,13 @@ function Stat({ n, l }: { n: number | string; l: string }) {
   );
 }
 
-/** "MM.DD"；入参是缓存返回的 ISO 字符串，在边界处才转成 Date */
+/** "MM.DD"；入参是缓存返回的 ISO 字符串，按 Asia/Shanghai 切分（服务器在 UTC） */
 function formatMonthDay(iso: string | null) {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+  const local = toDatetimeLocal(d);
+  return `${local.slice(5, 7)}.${local.slice(8, 10)}`;
 }
 
 export default async function HomePage() {

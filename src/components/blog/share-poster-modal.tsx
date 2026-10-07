@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import QRCode from "qrcode";
 import { Download, Copy, Check, X, Sparkles, Loader2 } from "lucide-react";
 import type { TagSummary } from "@/lib/db/queries";
 
@@ -252,7 +251,8 @@ function SharePosterContent({ post, onClose }: { post: SharePosterData; onClose:
         ctx.lineTo(width - 96, 1140);
         ctx.stroke();
 
-        // 生成二维码图片 (黑白)
+        // 生成二维码图片 (黑白)；qrcode 动态加载——不点海报不付包体
+        const { default: QRCode } = await import("qrcode");
         const qrDataUrl = await QRCode.toDataURL(post.url, {
           width: 220,
           margin: 1,

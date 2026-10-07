@@ -8,9 +8,11 @@ import {
   createPost,
   updatePost,
   deletePost,
+  getPostContentById,
   TagWriteError,
   POSTS_CACHE_TAG,
 } from "@/lib/db/queries";
+import { isUuid } from "@/lib/utils";
 
 export type PostActionState = {
   errors?: Record<string, string[]>;
@@ -91,10 +93,9 @@ function parseTags(formData: FormData): PostTagInput[] {
 // 把表单字段转成 zod 想要的结构；slug 留空则用 slugify(title)，中文标题空串时兜底
 function parseForm(formData: FormData): PostInput {
   const title = String(formData.get("title") ?? "");
-  const rawSlug = String(formData.get("slug") ?? "")
-    .trim()
-    .toLowerCase();
-  const slug = rawSlug || slugify(title) || `post-${Date.now().toString(36)}`;
+  const rawSlug = String(formData.get("slug") ?? "").trim();
+  // 手工 slug 与标题生成的 slug 都走 slugify 归一（Unicode），归一后为空再用时间戳兜底
+  const slug = slugify(rawSlug) || slugify(title) || `post-${Date.now().toString(36)}`;
 
   return {
     title,
@@ -160,6 +161,16 @@ export async function updatePostAction(
   }
   revalidatePostCaches();
   redirect("/admin/posts");
+}
+
+/**
+ * 后台复制按钮的惰性取文：列表不再把整篇 contentMd 塞进 RSC payload，
+ * 点击复制时才取（isAdmin + UUID 校验）。null = 未授权或文章不存在。
+ */
+export async function getPostContentAction(id: string): Promise<string | null> {
+  if (!(await isAdmin())) return null;
+  if (!isUuid(id)) return null;
+  return getPostContentById(id);
 }
 
 export async function deletePostAction(id: string) {

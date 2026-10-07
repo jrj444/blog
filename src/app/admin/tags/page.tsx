@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Tags } from "lucide-react";
 import { getAdminTagKpis, listAdminTags } from "@/lib/db/queries";
-import { toDatetimeLocal } from "@/lib/format-date";
+import { formatDateShort } from "@/lib/format-date";
 import { cn } from "@/lib/utils";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { toggleTagActiveAction } from "./actions";
@@ -139,88 +139,94 @@ export default async function AdminTagsPage({ searchParams }: Props) {
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                <th className="px-5 py-3 font-medium">标签</th>
-                <th className="px-5 py-3 font-medium">已发布</th>
-                <th className="px-5 py-3 font-medium">总关联</th>
-                <th className="px-5 py-3 font-medium">状态</th>
-                <th className="px-5 py-3 font-medium">最近使用</th>
-                <th className="px-5 py-3 text-right font-medium">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((tag) => (
-                <tr
-                  key={tag.id}
-                  className="border-b border-border/60 transition-colors last:border-0 hover:bg-muted/25"
-                >
-                  <td className="max-w-[360px] px-5 py-4">
-                    <Link
-                      href={`/admin/tags/${tag.id}`}
-                      className="font-medium transition-colors hover:text-primary"
-                    >
-                      #{tag.name}
-                    </Link>
-                    <span className="ml-2 font-mono text-xs text-muted-foreground">
-                      /{tag.slug}
-                    </span>
-                    {tag.description && (
-                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                        {tag.description}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-5 py-4 font-mono text-xs tabular-nums">{tag.publishedCount}</td>
-                  <td className="px-5 py-4 font-mono text-xs tabular-nums">{tag.totalRelations}</td>
-                  <td className="px-5 py-4">
-                    <span
-                      className={cn(
-                        "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium",
-                        tag.isActive
-                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                          : "bg-muted text-muted-foreground",
-                      )}
-                    >
-                      {tag.isActive ? "启用" : "停用"}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 font-mono text-xs tabular-nums">
-                    {tag.lastUsedAt ? toDatetimeLocal(tag.lastUsedAt).slice(0, 10) : "—"}
-                  </td>
-                  <td className="px-5 py-4 whitespace-nowrap">
-                    <div className="flex items-center justify-end gap-3 text-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                  <th className="px-5 py-3 font-medium">标签</th>
+                  <th className="px-5 py-3 font-medium">已发布</th>
+                  <th className="px-5 py-3 font-medium">总关联</th>
+                  <th className="px-5 py-3 font-medium">状态</th>
+                  <th className="px-5 py-3 font-medium">最近使用</th>
+                  <th className="px-5 py-3 text-right font-medium">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((tag) => (
+                  <tr
+                    key={tag.id}
+                    className="border-b border-border/60 transition-colors last:border-0 hover:bg-muted/25"
+                  >
+                    <td className="max-w-[360px] px-5 py-4">
                       <Link
                         href={`/admin/tags/${tag.id}`}
-                        className="text-muted-foreground transition-colors hover:text-foreground"
+                        className="font-medium transition-colors hover:text-primary"
                       >
-                        编辑
+                        #{tag.name}
                       </Link>
-                      <form action={toggleTagActiveAction.bind(null, tag.id, !tag.isActive)}>
-                        <button
-                          type="submit"
-                          className="text-muted-foreground transition-colors hover:text-foreground"
-                        >
-                          {tag.isActive ? "停用" : "启用"}
-                        </button>
-                      </form>
-                      {tag.totalRelations === 0 ? (
-                        <DeleteTagButton id={tag.id} name={tag.name} />
-                      ) : (
-                        <span
-                          className="cursor-not-allowed text-muted-foreground/50"
-                          title="先移除全部关联或停用后再删除"
-                        >
-                          删除
+                      <span className="ml-2 font-mono text-xs text-muted-foreground">
+                        /{tag.slug}
+                      </span>
+                      {tag.description && (
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                          {tag.description}
                         </span>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </td>
+                    <td className="px-5 py-4 font-mono text-xs tabular-nums">
+                      {tag.publishedCount}
+                    </td>
+                    <td className="px-5 py-4 font-mono text-xs tabular-nums">
+                      {tag.totalRelations}
+                    </td>
+                    <td className="px-5 py-4">
+                      <span
+                        className={cn(
+                          "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium",
+                          tag.isActive
+                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                            : "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {tag.isActive ? "启用" : "停用"}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 font-mono text-xs tabular-nums">
+                      {tag.lastUsedAt ? formatDateShort(tag.lastUsedAt) : "—"}
+                    </td>
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-3 text-xs">
+                        <Link
+                          href={`/admin/tags/${tag.id}`}
+                          className="text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          编辑
+                        </Link>
+                        <form action={toggleTagActiveAction.bind(null, tag.id, !tag.isActive)}>
+                          <button
+                            type="submit"
+                            className="text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            {tag.isActive ? "停用" : "启用"}
+                          </button>
+                        </form>
+                        {tag.totalRelations === 0 ? (
+                          <DeleteTagButton id={tag.id} name={tag.name} />
+                        ) : (
+                          <span
+                            className="cursor-not-allowed text-muted-foreground/50"
+                            title="先移除全部关联或停用后再删除"
+                          >
+                            删除
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

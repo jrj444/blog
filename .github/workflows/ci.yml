@@ -39,6 +39,14 @@ jobs:
       - name: Type check
         run: pnpm run typecheck
 
+      # 已有的 Vitest 断言（标签归一化 / slug）必须随 CI 回归
+      - name: Test
+        run: pnpm run test
+
+      # schema.ts 与迁移快照漂移检测：无变更时 generate 不产生任何文件
+      - name: Drizzle migrations up to date
+        run: pnpm exec drizzle-kit generate && git diff --exit-code drizzle/
+
       # 构建期不访问数据库（前台页面均为 force-dynamic，admin 页面需要会话），
       # 所以这里用占位值即可验证「能不能构建通过」。
       # 这些不是真实密钥，也不要在此处加入任何真实凭证。

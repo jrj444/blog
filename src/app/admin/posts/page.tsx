@@ -2,9 +2,11 @@ import Link from "next/link";
 import { ExternalLink, Eye, Feather, PenLine, Search } from "lucide-react";
 import { listPosts } from "@/lib/db/queries";
 import { DeletePostButton } from "@/components/admin/delete-post-button";
+import { getPostContentAction } from "./actions";
 import { CopyContentButton } from "@/components/blog/copy-content-button";
 import { AdminPageHeader } from "@/components/admin/admin-page-header";
 import { Button } from "@/components/ui/button";
+import { formatDateShort } from "@/lib/format-date";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
@@ -214,8 +216,8 @@ export default async function AdminPostsPage({
                         {post.views}
                       </span>
                     </td>
-                    <td className="px-5 py-4 font-mono text-xs text-muted-foreground">
-                      {new Date(post.createdAt).toLocaleDateString("zh-CN")}
+                    <td className="px-5 py-4 font-mono text-xs whitespace-nowrap text-muted-foreground">
+                      {formatDateShort(post.createdAt)}
                     </td>
                     <td className="px-5 py-4 whitespace-nowrap">
                       <div className="flex items-center justify-end gap-3">
@@ -239,7 +241,7 @@ export default async function AdminPostsPage({
                         </Link>
                         <CopyContentButton
                           title={post.title}
-                          content={post.contentMd}
+                          fetchContent={getPostContentAction.bind(null, post.id)}
                           label="复制"
                           variant="link"
                         />

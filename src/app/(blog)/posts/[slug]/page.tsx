@@ -163,7 +163,7 @@ export default async function PostPage({ params }: Props) {
                     url: postUrl,
                   }}
                 />
-                <CopyContentButton content={post.contentMd} />
+                <CopyContentButton title={post.title} content={post.contentMd} />
               </div>
               <Link
                 href="/posts"

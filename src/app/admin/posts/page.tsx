@@ -217,7 +217,7 @@ export default async function AdminPostsPage({
                     <td className="px-5 py-4 font-mono text-xs text-muted-foreground">
                       {new Date(post.createdAt).toLocaleDateString("zh-CN")}
                     </td>
-                    <td className="px-5 py-4">
+                    <td className="px-5 py-4 whitespace-nowrap">
                       <div className="flex items-center justify-end gap-3">
                         {post.published && (
                           <Link
@@ -237,7 +237,12 @@ export default async function AdminPostsPage({
                         >
                           编辑
                         </Link>
-                        <CopyContentButton content={post.contentMd} label="复制" variant="link" />
+                        <CopyContentButton
+                          title={post.title}
+                          content={post.contentMd}
+                          label="复制"
+                          variant="link"
+                        />
                         <DeletePostButton id={post.id} title={post.title} />
                       </div>
                     </td>

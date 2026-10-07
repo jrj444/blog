@@ -189,7 +189,7 @@ export default async function AdminTagsPage({ searchParams }: Props) {
                   <td className="px-5 py-4 font-mono text-xs tabular-nums">
                     {tag.lastUsedAt ? toDatetimeLocal(tag.lastUsedAt).slice(0, 10) : "—"}
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-5 py-4 whitespace-nowrap">
                     <div className="flex items-center justify-end gap-3 text-xs">
                       <Link
                         href={`/admin/tags/${tag.id}`}

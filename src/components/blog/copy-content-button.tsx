@@ -5,6 +5,8 @@ import { Check, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type CopyContentButtonProps = {
+  /** 文章标题：有值时复制为「# 标题 + 空行 + 正文」 */
+  title?: string;
   /** 要复制的原始内容（Markdown 源文） */
   content: string;
   label?: string;
@@ -26,6 +28,7 @@ const STYLES = {
  * 「复制失败」反馈并自动复位，不静默。
  */
 export function CopyContentButton({
+  title,
   content,
   label = "复制原文",
   copiedLabel = "已复制",
@@ -34,13 +37,14 @@ export function CopyContentButton({
 }: CopyContentButtonProps) {
   const [state, setState] = useState<"idle" | "copied" | "error">("idle");
   const timerRef = useRef<number | undefined>(undefined);
+  const copyText = title ? `# ${title}\n\n${content}` : content;
 
   // 卸载时清掉复位定时器，避免对已卸载组件 setState
   useEffect(() => () => window.clearTimeout(timerRef.current), []);
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(content);
+      await navigator.clipboard.writeText(copyText);
       setState("copied");
     } catch {
       setState("error");

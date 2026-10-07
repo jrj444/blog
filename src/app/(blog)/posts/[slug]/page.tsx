@@ -45,7 +45,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       type: "article",
       title: post.title,
       description: post.excerpt ?? undefined,
-      publishedTime: toIsoString(post.createdAt),
+      publishedTime: toIsoString(post.publishedAt ?? post.createdAt),
       // 有显式封面图时使用；未提供时留空，Next.js 会自动使用同路由下的 opengraph-image.tsx 生成 1200x630 海报
       ...(post.coverImage ? { images: [{ url: post.coverImage }] } : {}),
     },
@@ -76,7 +76,7 @@ export default async function PostPage({ params }: Props) {
     "@type": "BlogPosting",
     headline: post.title,
     description: post.excerpt ?? undefined,
-    datePublished: toIsoString(post.createdAt),
+    datePublished: toIsoString(post.publishedAt ?? post.createdAt),
     dateModified: toIsoString(post.updatedAt),
     url: postUrl,
     image: [ogImageUrl],
@@ -115,8 +115,11 @@ export default async function PostPage({ params }: Props) {
             {post.title}
           </h1>
           <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-[11px] tracking-[0.12em] text-muted-foreground uppercase">
-            <time dateTime={toIsoString(post.createdAt)} className="tabular-nums">
-              {formatDate(post.createdAt)}
+            <time
+              dateTime={toIsoString(post.publishedAt ?? post.createdAt)}
+              className="tabular-nums"
+            >
+              {formatDate(post.publishedAt ?? post.createdAt)}
             </time>
             <span className="inline-flex items-center gap-1 tabular-nums">
               <Eye aria-hidden className="size-3.5" />
@@ -160,7 +163,7 @@ export default async function PostPage({ params }: Props) {
                     slug: post.slug,
                     excerpt: post.excerpt,
                     tags: post.tags,
-                    date: formatDate(post.createdAt),
+                    date: formatDate(post.publishedAt ?? post.createdAt),
                     readingMinutes: readingTime(post.contentMd).minutes,
                     url: postUrl,
                   }}

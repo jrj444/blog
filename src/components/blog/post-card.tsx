@@ -17,7 +17,7 @@ function dateParts(date: Date | string) {
  * 字数/阅读时长由 SQL 侧算好，避免列表页搬运整篇 content_md。
  */
 export function PostCard({ post }: { post: PostListItem }) {
-  const { day, my } = dateParts(post.createdAt);
+  const { day, my } = dateParts(post.publishedAt ?? post.createdAt);
   const { charCount, readingMinutes } = post;
 
   return (

@@ -14,7 +14,7 @@ export async function GET() {
   <title>${escapeXml(post.title)}</title>
   <link>${escapeXml(link)}</link>
   <guid>${escapeXml(link)}</guid>
-  <pubDate>${toUtcString(post.createdAt)}</pubDate>
+  <pubDate>${toUtcString(post.publishedAt ?? post.createdAt)}</pubDate>
   <description>${escapeXml(post.excerpt ?? "")}</description>
   <content:encoded>${escapeXml(post.contentMd)}</content:encoded>
 </item>`;

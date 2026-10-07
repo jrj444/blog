@@ -19,7 +19,7 @@ export default async function Image({ params }: Props) {
   const title = post?.title ?? siteConfig.name;
   const excerpt = post?.excerpt ?? siteConfig.description;
   const tags = post?.tags ?? [];
-  const dateStr = post ? formatDate(post.createdAt) : "";
+  const dateStr = post ? formatDate(post.publishedAt ?? post.createdAt) : "";
 
   return new ImageResponse(
     <div

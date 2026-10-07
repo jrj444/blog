@@ -144,13 +144,14 @@ export default async function AdminPostsPage({
       {/* 文章表格 */}
       <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[800px] text-left text-sm">
+          <table className="w-full min-w-[900px] text-left text-sm">
             <thead className="border-b border-border bg-muted/35 text-[10.5px] tracking-[0.1em] text-muted-foreground uppercase">
               <tr>
                 <th className="px-5 py-3.5 font-medium">标题</th>
                 <th className="w-24 px-5 py-3.5 font-medium">状态</th>
                 <th className="w-24 px-5 py-3.5 font-medium">阅读量</th>
-                <th className="w-36 px-5 py-3.5 font-medium">创建时间</th>
+                <th className="w-32 px-5 py-3.5 font-medium">发布时间</th>
+                <th className="w-32 px-5 py-3.5 font-medium">创建时间</th>
                 <th className="w-40 px-5 py-3.5 text-right font-medium">操作</th>
               </tr>
             </thead>
@@ -215,6 +216,9 @@ export default async function AdminPostsPage({
                         <Eye aria-hidden className="size-3 text-muted-foreground/60" />
                         {post.views}
                       </span>
+                    </td>
+                    <td className="px-5 py-4 font-mono text-xs whitespace-nowrap text-muted-foreground">
+                      {post.publishedAt ? formatDateShort(post.publishedAt) : "—"}
                     </td>
                     <td className="px-5 py-4 font-mono text-xs whitespace-nowrap text-muted-foreground">
                       {formatDateShort(post.createdAt)}

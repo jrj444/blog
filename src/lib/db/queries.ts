@@ -44,6 +44,7 @@ const listColumns = {
   coverImage: posts.coverImage,
   tags: activeTagsPerPost,
   published: posts.published,
+  publishedAt: posts.publishedAt,
   views: posts.views,
   createdAt: posts.createdAt,
   updatedAt: posts.updatedAt,
@@ -59,6 +60,7 @@ type PostListRow = {
   coverImage: string | null;
   tags: TagSummary[];
   published: boolean;
+  publishedAt: Date | null;
   views: number;
   createdAt: Date;
   updatedAt: Date;
@@ -211,6 +213,7 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
           excerpt: posts.excerpt,
           coverImage: posts.coverImage,
           published: posts.published,
+          publishedAt: posts.publishedAt,
           views: posts.views,
           createdAt: posts.createdAt,
           updatedAt: posts.updatedAt,
@@ -645,9 +648,9 @@ async function queryListPublishedPosts(args: PublishedPostsArgs): Promise<Publis
     .from(posts)
     .where(where)
     .orderBy(
-      // 搜索时标题命中优先,再按时间倒序;非搜索按时间倒序
+      // 搜索时标题命中优先;非搜索按发布时间倒序（发布时间即前台时间线）
       ...(pattern ? [desc(sql`${posts.title} ilike ${pattern}`)] : []),
-      desc(posts.createdAt),
+      desc(posts.publishedAt),
     )
     .limit(pageSize)
     .offset(offset);
@@ -689,9 +692,9 @@ export async function searchPublishedPosts(q: string, limit = 8): Promise<PostLi
         ),
       )
       .orderBy(
-        // 标题命中优先，再按时间倒序
+        // 标题命中优先，再按发布时间倒序
         desc(sql`${posts.title} ilike ${pattern}`),
-        desc(posts.createdAt),
+        desc(posts.publishedAt),
       )
       .limit(limit);
 
@@ -731,14 +734,15 @@ export type PostSiblingsResult = {
 };
 
 /**
- * 获取指定文章的上一篇与下一篇（仅限已发布）。
- * 针对当前文章的 id 查询其精准数据库 created_at，杜绝 JS Date 序列化微秒精度截断导致的自匹配问题。
+ * 获取指定文章的上一篇与下一篇（仅限已发布），按发布时间线排序（published_at）。
+ * 针对当前文章的 id 查询其精准数据库 published_at，杜绝 JS Date 序列化微秒精度截断导致的自匹配问题。
  * 并显式排除当前文章自身（ne(posts.id, postId)）。
  * 上一篇（prev）：发布时间早于当前文章，按时间倒序取第 1 篇
  * 下一篇（next）：发布时间晚于当前文章，按时间正序取第 1 篇
+ * 已发布文章的 published_at 由应用层保证非空（§5.3），NULL 行在比较中自然落选。
  */
 async function queryPostSiblings(postId: string): Promise<PostSiblingsResult> {
-  const currentCreatedAtSql = sql`(select ${posts.createdAt} from ${posts} where ${posts.id} = ${postId}::uuid)`;
+  const currentPublishedAtSql = sql`(select ${posts.publishedAt} from ${posts} where ${posts.id} = ${postId}::uuid)`;
 
   const [prevRow] = await db
     .select({ slug: posts.slug, title: posts.title })
@@ -748,12 +752,12 @@ async function queryPostSiblings(postId: string): Promise<PostSiblingsResult> {
         eq(posts.published, true),
         ne(posts.id, postId),
         or(
-          lt(posts.createdAt, currentCreatedAtSql),
-          and(eq(posts.createdAt, currentCreatedAtSql), sql`${posts.id} < ${postId}::uuid`),
+          lt(posts.publishedAt, currentPublishedAtSql),
+          and(eq(posts.publishedAt, currentPublishedAtSql), sql`${posts.id} < ${postId}::uuid`),
         ),
       ),
     )
-    .orderBy(desc(posts.createdAt), desc(posts.id))
+    .orderBy(desc(posts.publishedAt), desc(posts.id))
     .limit(1);
 
   const [nextRow] = await db
@@ -764,12 +768,12 @@ async function queryPostSiblings(postId: string): Promise<PostSiblingsResult> {
         eq(posts.published, true),
         ne(posts.id, postId),
         or(
-          gt(posts.createdAt, currentCreatedAtSql),
-          and(eq(posts.createdAt, currentCreatedAtSql), sql`${posts.id} > ${postId}::uuid`),
+          gt(posts.publishedAt, currentPublishedAtSql),
+          and(eq(posts.publishedAt, currentPublishedAtSql), sql`${posts.id} > ${postId}::uuid`),
         ),
       ),
     )
-    .orderBy(asc(posts.createdAt), asc(posts.id))
+    .orderBy(asc(posts.publishedAt), asc(posts.id))
     .limit(1);
 
   return {
@@ -820,7 +824,12 @@ export const allPublishedPostMeta = cached("published-post-meta", () =>
 
 /** RSS：全部已发布文章全文（content:encoded），上限 50 条防超大库拖垮 feed */
 export const allPublishedPosts = cached("all-published", () =>
-  db.select().from(posts).where(eq(posts.published, true)).orderBy(desc(posts.createdAt)).limit(50),
+  db
+    .select()
+    .from(posts)
+    .where(eq(posts.published, true))
+    .orderBy(desc(posts.publishedAt), desc(posts.createdAt))
+    .limit(50),
 );
 
 /** 后台复制按钮：惰性取单篇正文（不拉进列表查询与 RSC payload） */

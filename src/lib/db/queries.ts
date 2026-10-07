@@ -1327,8 +1327,10 @@ export function extractR2Key(urlOrPath: string): string | null {
 export async function listMediaReferences(): Promise<Record<string, MediaReference[]>> {
   return queryWithRetry(async () => {
     // 图片 URL 正则：捕获 Markdown ![alt](url) 和 <img src="url">
+    // (?n) 行敏感前缀：PG 的 ARE 里 `.` 默认匹配换行（与 JS 不同），无它时 `.*?` 会
+    // 从更早的 `![` 一路跨行吞到后面某个 `](`，导致真实正文插图被跳过、引用误判为 0
     const IMG_REGEX =
-      "(?:!\\[.*?\\]\\((https?://[^\\s\\)\"'<>]+|/[^\\s\\)\"'<>]+\\.[a-zA-Z0-9]+)\\)|<img\\s[^>]*src=[\"']([^\"']+)[\"'])";
+      "(?n)(?:!\\[.*?\\]\\((https?://[^\\s\\)\"'<>]+|/[^\\s\\)\"'<>]+\\.[a-zA-Z0-9]+)\\)|<img\\s[^>]*src=[\"']([^\"']+)[\"'])";
 
     // 1) 从正文提取所有图片 URL（LATERAL + regexp_matches + 'g' flag）
     const contentRows = await db.execute(sql`

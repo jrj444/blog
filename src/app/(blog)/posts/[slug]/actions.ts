@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { z } from "zod";
-import { getPublishedPostContentBySlug, incrementViews } from "@/lib/db/queries";
+import { getPublishedPostContentBySlug, incrementViews, togglePostLike } from "@/lib/db/queries";
 import { toDatetimeLocal } from "@/lib/format-date";
 
 const VIEW_COOKIE = "vw";
@@ -41,4 +41,26 @@ export async function trackView(postId: string) {
 export async function getPostContentBySlug(slug: string): Promise<string | null> {
   if (!slug || slug.length > 200) return null;
   return getPublishedPostContentBySlug(slug);
+}
+
+const LIKE_COOKIE = "lk_visitor";
+
+export async function toggleLikeAction(postId: string) {
+  if (!z.string().uuid().safeParse(postId).success) {
+    throw new Error("Invalid post ID");
+  }
+  const store = await cookies();
+  let visitorId = store.get(LIKE_COOKIE)?.value;
+
+  if (!visitorId || !z.string().uuid().safeParse(visitorId).success) {
+    visitorId = crypto.randomUUID();
+    store.set(LIKE_COOKIE, visitorId, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365, // 1 年
+    });
+  }
+
+  return togglePostLike(postId, visitorId);
 }

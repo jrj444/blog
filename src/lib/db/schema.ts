@@ -82,6 +82,22 @@ export const postTags = pgTable(
   (table) => [primaryKey({ columns: [table.postId, table.tagId] })],
 );
 
+// 文章点赞关联表
+// 联合主键 (postId, visitorId) 天然防止重复点赞，博客体量直接 count(*) 计算总数
+export const postLikes = pgTable(
+  "post_likes",
+  {
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    visitorId: uuid("visitor_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.postId, table.visitorId] })],
+);
+
+export type PostLike = typeof postLikes.$inferSelect;
+export type NewPostLike = typeof postLikes.$inferInsert;
 export type Tag = typeof tags.$inferSelect;
 export type NewTag = typeof tags.$inferInsert;
 export type PostTag = typeof postTags.$inferSelect;

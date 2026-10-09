@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { db, queryWithRetry } from "@/lib/db";
-import { postTags, posts, tags, type Post } from "@/lib/db/schema";
+import { postLikes, postTags, posts, tags, type Post } from "@/lib/db/schema";
 import {
   count,
   eq,
@@ -1385,4 +1385,44 @@ export async function listMediaReferences(): Promise<Record<string, MediaReferen
 
     return refMap;
   });
+}
+
+/**
+ * 获取当前文章点赞数以及当前访客是否已赞
+ */
+export async function getLikeState(
+  postId: string,
+  visitorId?: string,
+): Promise<{ count: number; liked: boolean }> {
+  const [countResult, userLike] = await Promise.all([
+    db.select({ value: count() }).from(postLikes).where(eq(postLikes.postId, postId)),
+    visitorId
+      ? db.query.postLikes.findFirst({
+          where: and(eq(postLikes.postId, postId), eq(postLikes.visitorId, visitorId)),
+        })
+      : Promise.resolve(null),
+  ]);
+  return {
+    count: countResult[0]?.value ?? 0,
+    liked: Boolean(userLike),
+  };
+}
+
+/**
+ * 点赞/取消点赞
+ */
+export async function togglePostLike(postId: string, visitorId: string) {
+  const existing = await db.query.postLikes.findFirst({
+    where: and(eq(postLikes.postId, postId), eq(postLikes.visitorId, visitorId)),
+  });
+
+  if (existing) {
+    await db
+      .delete(postLikes)
+      .where(and(eq(postLikes.postId, postId), eq(postLikes.visitorId, visitorId)));
+  } else {
+    await db.insert(postLikes).values({ postId, visitorId }).onConflictDoNothing();
+  }
+
+  return getLikeState(postId, visitorId);
 }

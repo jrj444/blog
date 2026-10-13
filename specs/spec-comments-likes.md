@@ -309,7 +309,7 @@ flowchart LR
 | S1 | ✅ 已完成 | 2026-10-09 | post_likes 联合主键表定义与迁移 0003 执行完毕 |
 | S2 | ✅ 已完成 | 2026-10-09 | queries (getLikeState/togglePostLike) 与 toggleLikeAction 完成 |
 | S3 | ✅ 已完成 | 2026-10-09 | LikeButton 客户端组件编写并挂载文章页，乐观更新手测成功 |
-| S4 | ⬜ 待开始 | - | 评论表结构与自引用外键 |
+| S4 | ✅ 已完成 | 2026-10-13 | comments 自引用外键表与 4 个索引定义完毕，迁移 0004 执行成功 |
 | S5 | ⬜ 待开始 | - | 评论提交 Action（Zod + 蜜罐 + 限流） |
 | S6 | ⬜ 待开始 | - | 审核 Action 与缓存失效 |
 | S7 | ⬜ 待开始 | - | 后台 /admin/comments 界面 |

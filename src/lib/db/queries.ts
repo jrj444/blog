@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { db, queryWithRetry } from "@/lib/db";
-import { postLikes, postTags, posts, tags, type Post } from "@/lib/db/schema";
+import { postLikes, postTags, posts, tags, type Post, comments, NewComment } from "@/lib/db/schema";
 import {
   count,
   eq,
@@ -30,10 +30,36 @@ import { MINUTES_PER_CHAR } from "@/lib/reading-time";
  */
 const activeTagsPerPost = sql<TagSummary[]>`coalesce((
   select json_agg(json_build_object('id', t.id, 'name', t.name, 'slug', t.slug) order by pt.position)
-  from ${postTags} pt
-  join ${tags} t on t.id = pt.tag_id
-  where pt.post_id = ${posts.id} and t.is_active
-), '[]'::json)`;
+  from
+${postTags}
+pt
+join
+${tags}
+t
+on
+t
+.
+id
+=
+pt
+.
+tag_id
+where
+pt
+.
+post_id
+=
+${posts.id}
+and
+t
+.
+is_active
+),
+'[]'
+:
+:
+json
+)`;
 
 /** 列表页只需要这些列：正文 content_md 不参与列表渲染（否则每次列表都要搬运全文）。 */
 const listColumns = {
@@ -49,7 +75,17 @@ const listColumns = {
   createdAt: posts.createdAt,
   updatedAt: posts.updatedAt,
   // 阅读时长在 SQL 里算，避免为了一个「x 分钟」把整篇正文取回应用层
-  charCount: sql<number>`length(regexp_replace(${posts.contentMd}, '\\s', '', 'g'))::int`,
+  charCount: sql<number>`length
+  (regexp_replace(
+  ${posts.contentMd},
+  '\\s',
+  '',
+  'g'
+  )
+  )
+  :
+  :
+  int`,
 };
 
 type PostListRow = {
@@ -167,10 +203,7 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
 
     // 1) 全局各状态总数（不受 status / search 影响，供 Tab 徽章展示）
     const countRows = await db.execute(sql`
-      select
-        count(*)::int as total,
-        count(*) filter (where ${posts.published})::int as published,
-        count(*) filter (where not ${posts.published})::int as draft
+      select count(*)::int as total, count(*) filter (where ${posts.published})::int as published, count(*) filter (where not ${posts.published})::int as draft
       from ${posts}
     `);
     const countRow = firstRow(countRows as ReadonlyArray<Record<string, number>>);
@@ -320,15 +353,11 @@ export function listTopViewedPosts(limit = 5) {
 export async function getDashboardStats() {
   return queryWithRetry(async () => {
     const rows = await db.execute(sql`
-      select
-        count(*) filter (where ${posts.published})::int as published,
-        count(*) filter (where not ${posts.published})::int as drafts,
-        count(*) filter (
+      select count(*) filter (where ${posts.published})::int as published, count(*) filter (where not ${posts.published})::int as drafts, count(*) filter (
           where ${posts.published}
             and ${posts.publishedAt} is not null
             and extract(year from ${posts.publishedAt}) = extract(year from now())
-        )::int as this_year,
-        coalesce(sum(${posts.views}), 0)::int as views
+        )::int as this_year, coalesce(sum(${posts.views}), 0) ::int as views
       from ${posts}
     `);
 
@@ -635,7 +664,17 @@ async function queryListPublishedPosts(args: PublishedPostsArgs): Promise<Publis
   if (tagId) {
     // 按关系表过滤（§11.1）：不再 arrayContains 数组列
     conditions.push(
-      sql`exists (select 1 from ${postTags} where ${postTags.postId} = ${posts.id} and ${postTags.tagId} = ${tagId})`,
+      sql`exists (select 1 from
+      ${postTags}
+      where
+      ${postTags.postId}
+      =
+      ${posts.id}
+      and
+      ${postTags.tagId}
+      =
+      ${tagId}
+      )`,
     );
   }
   if (pattern) {
@@ -649,7 +688,13 @@ async function queryListPublishedPosts(args: PublishedPostsArgs): Promise<Publis
     .where(where)
     .orderBy(
       // 搜索时标题命中优先;非搜索按发布时间倒序（发布时间即前台时间线）
-      ...(pattern ? [desc(sql`${posts.title} ilike ${pattern}`)] : []),
+      ...(pattern
+        ? [
+            desc(sql`${posts.title}
+          ilike
+          ${pattern}`),
+          ]
+        : []),
       desc(posts.publishedAt),
     )
     .limit(pageSize)
@@ -693,7 +738,9 @@ export async function searchPublishedPosts(q: string, limit = 8): Promise<PostLi
       )
       .orderBy(
         // 标题命中优先，再按发布时间倒序
-        desc(sql`${posts.title} ilike ${pattern}`),
+        desc(sql`${posts.title}
+        ilike
+        ${pattern}`),
         desc(posts.publishedAt),
       )
       .limit(limit);
@@ -753,7 +800,15 @@ async function queryPostSiblings(postId: string): Promise<PostSiblingsResult> {
         ne(posts.id, postId),
         or(
           lt(posts.publishedAt, currentPublishedAtSql),
-          and(eq(posts.publishedAt, currentPublishedAtSql), sql`${posts.id} < ${postId}::uuid`),
+          and(
+            eq(posts.publishedAt, currentPublishedAtSql),
+            sql`${posts.id}
+            <
+            ${postId}
+            :
+            :
+            uuid`,
+          ),
         ),
       ),
     )
@@ -769,7 +824,15 @@ async function queryPostSiblings(postId: string): Promise<PostSiblingsResult> {
         ne(posts.id, postId),
         or(
           gt(posts.publishedAt, currentPublishedAtSql),
-          and(eq(posts.publishedAt, currentPublishedAtSql), sql`${posts.id} > ${postId}::uuid`),
+          and(
+            eq(posts.publishedAt, currentPublishedAtSql),
+            sql`${posts.id}
+            >
+            ${postId}
+            :
+            :
+            uuid`,
+          ),
         ),
       ),
     )
@@ -792,13 +855,10 @@ export const getPostSiblings = cached("post-siblings", queryPostSiblings);
  */
 export const getPublishedStats = cached("published-stats", async () => {
   const rows = await db.execute(sql`
-    select
-      count(*)::int as total,
-      count(*) filter (
+    select count(*)::int as total, count(*) filter (
         where ${posts.publishedAt} is not null
           and extract(year from ${posts.publishedAt}) = extract(year from now())
-      )::int as this_year,
-      max(${posts.updatedAt}) as last_updated
+      )::int as this_year, max(${posts.updatedAt}) as last_updated
     from ${posts}
     where ${posts.published}
   `);
@@ -865,10 +925,11 @@ export const getPublishedPostContentBySlug = cached(
 function queryPublicTagsWithCounts(): Promise<TagSummaryWithCount[]> {
   return queryWithRetry(async () => {
     const rows = await db.execute(sql`
-      select t.id, t.name, t.slug, t.description, count(p.id)::int as count
+      select t.id, t.name, t.slug, t.description, count(p.id) ::int as count
       from ${tags} t
-      join ${postTags} pt on pt.tag_id = t.id
-      join ${posts} p on p.id = pt.post_id and p.published = true
+        join ${postTags} pt
+      on pt.tag_id = t.id
+        join ${posts} p on p.id = pt.post_id and p.published = true
       where t.is_active
       group by t.id, t.name, t.slug, t.description
       order by count desc, t.name
@@ -983,28 +1044,57 @@ export async function listAdminTags(params: AdminTagListParams = {}): Promise<Ad
         sql`(t.name ilike ${pattern} or t.slug ilike ${pattern} or t.description ilike ${pattern})`,
       );
     }
-    if (status === "active") conditions.push(sql`t.is_active`);
+    if (status === "active")
+      conditions.push(sql`t
+      .
+      is_active`);
     if (status === "inactive") conditions.push(sql`not t.is_active`);
     if (status === "unused") {
-      conditions.push(sql`not exists (select 1 from ${postTags} pt where pt.tag_id = t.id)`);
+      conditions.push(sql`not exists (select 1 from
+      ${postTags}
+      pt
+      where
+      pt
+      .
+      tag_id
+      =
+      t
+      .
+      id
+      )`);
     }
-    const where = conditions.length > 0 ? sql`where ${and(...conditions)}` : sql``;
+    const where =
+      conditions.length > 0
+        ? sql`where
+        ${and(...conditions)}`
+        : sql``;
     const orderBy =
       sort === "createdAt"
-        ? sql`t.created_at desc`
+        ? sql`t
+        .
+        created_at
+        desc`
         : sort === "updatedAt"
-          ? sql`t.updated_at desc`
-          : sql`published_count desc, t.name`;
+          ? sql`t
+          .
+          updated_at
+          desc`
+          : sql`published_count
+          desc, t.name`;
 
     const rows = await db.execute(sql`
-      select t.id, t.name, t.slug, t.description, t.is_active, t.created_at, t.updated_at,
-             count(p.id) filter (where p.published)::int as published_count,
-             count(p.id)::int as total_relations,
-             max(p.published_at) filter (where p.published) as last_used_at
+      select t.id,
+             t.name,
+             t.slug,
+             t.description,
+             t.is_active,
+             t.created_at,
+             t.updated_at,
+             count(p.id) filter (where p.published)::int as published_count, count(p.id)::int as total_relations, max(p.published_at) filter (where p.published) as last_used_at
       from ${tags} t
-      left join ${postTags} pt on pt.tag_id = t.id
-      left join ${posts} p on p.id = pt.post_id
-      ${where}
+             left join ${postTags} pt on pt.tag_id = t.id
+             left join ${posts} p on p.id = pt.post_id
+        ${where}
       group by t.id
       order by ${orderBy}
     `);
@@ -1043,8 +1133,7 @@ export type AdminTagKpis = { total: number; unused: number };
 export async function getAdminTagKpis(): Promise<AdminTagKpis> {
   return queryWithRetry(async () => {
     const rows = await db.execute(sql`
-      select count(*)::int as total,
-             count(*) filter (
+      select count(*)::int as total, count(*) filter (
                where not exists (select 1 from ${postTags} pt where pt.tag_id = ${tags.id})
              )::int as unused
       from ${tags}
@@ -1093,14 +1182,9 @@ export type TagUsageStats = {
 export async function listTagUsageStats(tagId: string): Promise<TagUsageStats> {
   return queryWithRetry(async () => {
     const rows = await db.execute(sql`
-      select
-        count(p.id) filter (where p.published)::int as published_count,
-        count(p.id) filter (where not p.published)::int as draft_count,
-        count(p.id)::int as total_relations,
-        coalesce(sum(p.views) filter (where p.published), 0)::int as total_views,
-        max(p.published_at) filter (where p.published) as last_used_at
+      select count(p.id) filter (where p.published)::int as published_count, count(p.id) filter (where not p.published)::int as draft_count, count(p.id)::int as total_relations, coalesce(sum(p.views) filter(where p.published), 0)::int as total_views, max(p.published_at) filter (where p.published) as last_used_at
       from ${postTags} pt
-      join ${posts} p on p.id = pt.post_id
+             join ${posts} p on p.id = pt.post_id
       where pt.tag_id = ${tagId}::uuid
     `);
     const row = firstRow(
@@ -1135,13 +1219,15 @@ export async function listTagMonthlyTrend(tagId: string, months = 12): Promise<T
       select to_char(date_trunc('month', p.published_at at time zone 'Asia/Shanghai'), 'YYYY-MM') as month,
              count(*)::int as count
       from ${postTags} pt
-      join ${posts} p on p.id = pt.post_id
+        join ${posts} p
+      on p.id = pt.post_id
       where pt.tag_id = ${tagId}::uuid
         and p.published = true
         and p.published_at is not null
         and p.published_at >= (
-          (date_trunc('month', now() at time zone 'Asia/Shanghai') - ((${months - 1}) || ' months')::interval)
-          at time zone 'Asia/Shanghai'
+          (date_trunc('month'
+          , now() at time zone 'Asia/Shanghai') - ((${months - 1}) || ' months'):: interval)
+        at time zone 'Asia/Shanghai'
         )
       group by 1
       order by 1
@@ -1334,19 +1420,26 @@ export async function listMediaReferences(): Promise<Record<string, MediaReferen
 
     // 1) 从正文提取所有图片 URL（LATERAL + regexp_matches + 'g' flag）
     const contentRows = await db.execute(sql`
-      select p.id, p.title, p.slug,
+      select p.id,
+             p.title,
+             p.slug,
              coalesce(m[1], m[2]) as url
       from ${posts} p,
-        lateral regexp_matches(p.content_md, ${IMG_REGEX}, 'g') as m
-      where coalesce(m[1], m[2]) is not null
-        and coalesce(m[1], m[2]) != ''
+           lateral regexp_matches(p.content_md, ${IMG_REGEX}, 'g') as m
+      where coalesce (m[1]
+          , m[2]) is not null
+        and coalesce (m[1]
+          , m[2]) != ''
     `);
 
     // 2) 封面图（直接取字段，无需正则）
     const coverRows = await db
       .select({ id: posts.id, title: posts.title, slug: posts.slug, coverImage: posts.coverImage })
-      .from(posts)
-      .where(sql`${posts.coverImage} is not null and ${posts.coverImage} != ''`);
+      .from(posts).where(sql`${posts.coverImage}
+      is not null and
+      ${posts.coverImage}
+      !=
+      ''`);
 
     const refMap: Record<string, MediaReference[]> = {};
 
@@ -1425,4 +1518,50 @@ export async function togglePostLike(postId: string, visitorId: string) {
   }
 
   return getLikeState(postId, visitorId);
+}
+
+/**
+ * 统计指定 ipHash 在最近 N 分钟内的评论提交数
+ * @param ipHash
+ * @param windowMinutes
+ */
+export async function countRecentCommentsByIpHash(
+  ipHash: string,
+  windowMinutes = 10,
+): Promise<number> {
+  const windowStart = new Date(Date.now() - windowMinutes * 60 * 1000);
+  const [result] = await db
+    .select({ value: count() })
+    .from(comments)
+    .where(and(eq(comments.ipHash, ipHash), gt(comments.createdAt, windowStart)));
+
+  return result?.value ?? 0;
+}
+
+/**
+ * 校验目标评论是否存在且已通过审核
+ * @param id
+ */
+export async function getApprovedCommentTarget(id: string) {
+  return db.query.comments.findFirst({
+    where: and(eq(comments.id, id), eq(comments.status, "approved")),
+  });
+}
+
+export async function insertPendingComment(data: NewComment) {
+  const [row] = await db
+    .insert(comments)
+    .values({
+      postId: data.postId,
+      authorName: data.authorName,
+      authorUrl: data.authorUrl || null,
+      content: data.content,
+      parentId: data.parentId || null,
+      replyToId: data.replyToId || null,
+      ipHash: data.ipHash,
+      status: "pending",
+    })
+    .returning();
+
+  return row;
 }

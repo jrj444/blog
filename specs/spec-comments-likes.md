@@ -310,7 +310,7 @@ flowchart LR
 | S2 | ✅ 已完成 | 2026-10-09 | queries (getLikeState/togglePostLike) 与 toggleLikeAction 完成 |
 | S3 | ✅ 已完成 | 2026-10-09 | LikeButton 客户端组件编写并挂载文章页，乐观更新手测成功 |
 | S4 | ✅ 已完成 | 2026-10-13 | comments 自引用外键表与 4 个索引定义完毕，迁移 0004 执行成功 |
-| S5 | ⬜ 待开始 | - | 评论提交 Action（Zod + 蜜罐 + 限流） |
+| S5 | ✅ 已完成 | 2026-10-14 | Zod 校验、蜜罐拦截、HMAC-SHA256 IP 限流与 addCommentAction 完成 |
 | S6 | ⬜ 待开始 | - | 审核 Action 与缓存失效 |
 | S7 | ⬜ 待开始 | - | 后台 /admin/comments 界面 |
 | S8 | ⬜ 待开始 | - | 知乎式楼中楼聚合算法 |

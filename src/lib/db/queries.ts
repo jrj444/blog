@@ -21,6 +21,7 @@ import { normalizeTagKey, normalizeTagName } from "@/lib/tags/normalize";
 import { buildTagSlug, normalizeManualTagSlug, withTagSlugSuffix } from "@/lib/tags/slug";
 import { escapeLike, normalizeSearchTerm } from "@/lib/db/search";
 import { MINUTES_PER_CHAR } from "@/lib/reading-time";
+import { alias } from "drizzle-orm/pg-core";
 
 // ---------- 列表投影 ----------
 
@@ -1548,6 +1549,10 @@ export async function getApprovedCommentTarget(id: string) {
   });
 }
 
+/**
+ * 插入评论
+ * @param data
+ */
 export async function insertPendingComment(data: NewComment) {
   const [row] = await db
     .insert(comments)
@@ -1564,4 +1569,136 @@ export async function insertPendingComment(data: NewComment) {
     .returning();
 
   return row;
+}
+
+// ------------- 后台评论管理查询 -------------
+
+const parentCommentsAlias = alias(comments, "parent_comment");
+const replyToCommentsAlias = alias(comments, "reply_to_comment");
+
+export type AdminCommentItem = {
+  id: string;
+  postId: string;
+  postTitle: string;
+  postSlug: string;
+  parentId: string | null;
+  replyToId: string | null;
+  parentAuthorName: string | null;
+  replyToAuthorName: string | null;
+  authorName: string;
+  authorUrl: string | null;
+  content: string;
+  status: string;
+  ipHash: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/**
+ * 后台评论列表
+ * @param options
+ */
+export async function listAdminComments(options: {
+  status?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<{
+  rows: AdminCommentItem[];
+  total: number;
+  totalPages: number;
+}> {
+  const page = Math.max(1, options.page ?? 1);
+  const pageSize = Math.max(1, Math.min(50, options.pageSize ?? 10));
+  const offset = (page - 1) * pageSize;
+
+  const whereCondition = options.status ? eq(comments.status, options.status) : undefined;
+
+  const [totalRes, rows] = await Promise.all([
+    db.select({ value: count() }).from(comments).where(whereCondition),
+    db
+      .select({
+        id: comments.id,
+        postId: comments.postId,
+        postTitle: posts.title,
+        postSlug: posts.slug,
+        parentId: comments.parentId,
+        replyToId: comments.replyToId,
+        parentAuthorName: parentCommentsAlias.authorName,
+        replyToAuthorName: replyToCommentsAlias.authorName,
+        authorName: comments.authorName,
+        authorUrl: comments.authorUrl,
+        content: comments.content,
+        status: comments.status,
+        ipHash: comments.ipHash,
+        createdAt: comments.createdAt,
+        updatedAt: comments.updatedAt,
+      })
+      .from(comments)
+      .innerJoin(posts, eq(posts.id, comments.postId))
+      .leftJoin(parentCommentsAlias, eq(parentCommentsAlias.id, comments.parentId))
+      .leftJoin(replyToCommentsAlias, eq(replyToCommentsAlias.id, comments.replyToId))
+      .where(whereCondition)
+      .orderBy(desc(comments.createdAt))
+      .limit(pageSize)
+      .offset(offset),
+  ]);
+
+  const total = totalRes[0]?.value ?? 0;
+  return {
+    rows,
+    total,
+    totalPages: Math.ceil(total / pageSize),
+  };
+}
+
+/**
+ * 获取后台评论状态 KPI 计数（待审数、已通过数，spec §5）
+ */
+export async function getAdminCommentKpis(): Promise<{ pending: number; approved: number }> {
+  const [pendingRes, approvedRes] = await Promise.all([
+    db.select({ value: count() }).from(comments).where(eq(comments.status, "pending")),
+    db.select({ value: count() }).from(comments).where(eq(comments.status, "approved")),
+  ]);
+  return {
+    pending: pendingRes[0]?.value ?? 0,
+    approved: approvedRes[0]?.value ?? 0,
+  };
+}
+
+/**
+ * 审核放行单条评论（pending -> approved）
+ */
+export async function approveCommentById(id: string) {
+  const [updated] = await db
+    .update(comments)
+    .set({
+      status: "approved",
+      updatedAt: new Date(),
+    })
+    .where(and(eq(comments.id, id), eq(comments.status, "pending")))
+    .returning({ id: comments.id, postId: comments.postId });
+  if (!updated) return null;
+  // 查出所属文章 slug，供后续精准失效前台路由缓存
+  const post = await db.query.posts.findFirst({
+    where: eq(posts.id, updated.postId),
+    columns: { slug: true },
+  });
+  return { id: updated.id, postSlug: post?.slug };
+}
+
+/**
+ * 删除评论（若是顶级评论，级联删除整楼，spec §7）
+ */
+export async function deleteCommentById(id: string) {
+  const comment = await db.query.comments.findFirst({
+    where: eq(comments.id, id),
+    columns: { id: true, postId: true },
+  });
+  if (!comment) return null;
+  const post = await db.query.posts.findFirst({
+    where: eq(posts.id, comment.postId),
+    columns: { slug: true },
+  });
+  await db.delete(comments).where(eq(comments.id, id));
+  return { id: comment.id, postSlug: post?.slug };
 }

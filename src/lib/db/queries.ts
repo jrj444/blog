@@ -22,6 +22,7 @@ import { buildTagSlug, normalizeManualTagSlug, withTagSlugSuffix } from "@/lib/t
 import { escapeLike, normalizeSearchTerm } from "@/lib/db/search";
 import { MINUTES_PER_CHAR } from "@/lib/reading-time";
 import { alias } from "drizzle-orm/pg-core";
+import { buildCommentThreads, type CommentThreadItem } from "@/lib/comments/tree";
 
 // ---------- 列表投影 ----------
 
@@ -1701,4 +1702,26 @@ export async function deleteCommentById(id: string) {
   });
   await db.delete(comments).where(eq(comments.id, id));
   return { id: comment.id, postSlug: post?.slug };
+}
+
+export type { CommentThreadItem, CommentReplyItem } from "@/lib/comments/tree";
+
+export async function listApprovedComments(postId: string): Promise<{
+  threads: CommentThreadItem[];
+  totalCount: number;
+}> {
+  const rows = await db
+    .select({
+      id: comments.id,
+      parentId: comments.parentId,
+      replyToId: comments.replyToId,
+      authorName: comments.authorName,
+      authorUrl: comments.authorUrl,
+      content: comments.content,
+      createdAt: comments.createdAt,
+    })
+    .from(comments)
+    .where(and(eq(comments.postId, postId), eq(comments.status, "approved")))
+    .orderBy(asc(comments.createdAt));
+  return buildCommentThreads(rows);
 }

@@ -802,15 +802,7 @@ async function queryPostSiblings(postId: string): Promise<PostSiblingsResult> {
         ne(posts.id, postId),
         or(
           lt(posts.publishedAt, currentPublishedAtSql),
-          and(
-            eq(posts.publishedAt, currentPublishedAtSql),
-            sql`${posts.id}
-            <
-            ${postId}
-            :
-            :
-            uuid`,
-          ),
+          and(eq(posts.publishedAt, currentPublishedAtSql), sql`${posts.id} < ${postId}::uuid`),
         ),
       ),
     )
@@ -826,15 +818,7 @@ async function queryPostSiblings(postId: string): Promise<PostSiblingsResult> {
         ne(posts.id, postId),
         or(
           gt(posts.publishedAt, currentPublishedAtSql),
-          and(
-            eq(posts.publishedAt, currentPublishedAtSql),
-            sql`${posts.id}
-            >
-            ${postId}
-            :
-            :
-            uuid`,
-          ),
+          and(eq(posts.publishedAt, currentPublishedAtSql), sql`${posts.id} > ${postId}::uuid`),
         ),
       ),
     )

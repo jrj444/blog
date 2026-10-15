@@ -314,7 +314,7 @@ flowchart LR
 | S6 | ✅ 已完成 | 2026-10-15 | 审核与删除 Action (approveCommentAction, deleteCommentAction) 及双端缓存失效完成 |
 | S7 | ✅ 已完成 | 2026-10-15 | 后台 /admin/comments 界面、导航入口与评论操作按钮组件完成 |
 | S8 | ✅ 已完成 | 2026-10-15 | 知乎式楼中楼聚合算法 (buildCommentThreads)、单元测试与 listApprovedComments 完成 |
-| S9 | ⬜ 待开始 | - | 前台评论组件与回复交互 |
+| S9 | ✅ 已完成 | 2026-10-15 | 前台知乎式评论组件 (comments.tsx)、回复联动交互与 ICP 备案开关完成 |
 | S10 | ⬜ 待开始 | - | RLS 策略与索引 |
 | S11 | ⬜ 待开始 | - | 全链路联调与验收 |
 

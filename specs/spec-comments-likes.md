@@ -312,7 +312,7 @@ flowchart LR
 | S4 | ✅ 已完成 | 2026-10-13 | comments 自引用外键表与 4 个索引定义完毕，迁移 0004 执行成功 |
 | S5 | ✅ 已完成 | 2026-10-14 | Zod 校验、蜜罐拦截、HMAC-SHA256 IP 限流与 addCommentAction 完成 |
 | S6 | ✅ 已完成 | 2026-10-15 | 审核与删除 Action (approveCommentAction, deleteCommentAction) 及双端缓存失效完成 |
-| S7 | ⬜ 待开始 | - | 后台 /admin/comments 界面 |
+| S7 | ✅ 已完成 | 2026-10-15 | 后台 /admin/comments 界面、导航入口与评论操作按钮组件完成 |
 | S8 | ⬜ 待开始 | - | 知乎式楼中楼聚合算法 |
 | S9 | ⬜ 待开始 | - | 前台评论组件与回复交互 |
 | S10 | ⬜ 待开始 | - | RLS 策略与索引 |

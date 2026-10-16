@@ -87,3 +87,19 @@ create index if not exists post_tags_tag_id_idx on post_tags (tag_id, post_id);
 
 -- 趋势统计（按 published_at 分月）与发布态过滤
 create index if not exists posts_published_at_idx on posts (published, published_at);
+
+-- ------------------------------------------------------------
+-- 评论与点赞（comments / post_likes）—— spec-comments-likes §8
+-- 启用 RLS，不建任何公开策略（非服务端 owner 一律拒绝）。
+-- 说明：访客写操作均通过服务端 Server Action 执行（输入校验、蜜罐拦截、HMAC 限流）；
+--       前台读操作均通过 RSC 服务端直连库（只查 approved 记录）。
+--       开启 RLS 可彻底杜绝任何绕过前端直连 Supabase 匿名端点窥探待审评论或刷赞。
+-- ------------------------------------------------------------
+alter table comments enable row level security;
+alter table post_likes enable row level security;
+
+-- 二级查询索引（与迁移 0004 保持一致，幂等声明）
+create index if not exists comments_post_created_idx on comments (post_id, created_at);
+create index if not exists comments_parent_created_idx on comments (parent_id, created_at);
+create index if not exists comments_ip_hash_idx on comments (ip_hash, created_at);
+create index if not exists comments_status_idx on comments (status, created_at);

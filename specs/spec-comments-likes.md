@@ -315,6 +315,6 @@ flowchart LR
 | S7 | ✅ 已完成 | 2026-10-15 | 后台 /admin/comments 界面、导航入口与评论操作按钮组件完成 |
 | S8 | ✅ 已完成 | 2026-10-15 | 知乎式楼中楼聚合算法 (buildCommentThreads)、单元测试与 listApprovedComments 完成 |
 | S9 | ✅ 已完成 | 2026-10-15 | 前台知乎式评论组件 (comments.tsx)、回复联动交互与 ICP 备案开关完成 |
-| S10 | ⬜ 待开始 | - | RLS 策略与索引 |
-| S11 | ⬜ 待开始 | - | 全链路联调与验收 |
+| S10 | ✅ 已完成 | 2026-10-16 | supabase/rls.sql 追加 comments/post_likes RLS 策略与二级索引，已全量执行完毕 |
+| S11 | ✅ 已完成 | 2026-10-16 | typecheck / lint / format:check / test / build 五重工程验收全绿通过 |
 

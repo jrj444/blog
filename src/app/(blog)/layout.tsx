@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Mail, Rss } from "lucide-react";
 import { isAdmin } from "@/auth";
+import { CookieConsentBanner } from "@/components/blog/cookie-consent-banner";
+import { PrivacyPolicyButton } from "@/components/blog/privacy-policy-modal";
 import { FloatingActionsProvider } from "@/components/blog/floating-actions-context";
 import { FloatingActionDock } from "@/components/blog/floating-action-dock";
 import { NavLinks } from "@/components/blog/nav-links";
@@ -144,7 +146,11 @@ export default async function BlogLayout({ children }: { children: React.ReactNo
 
             <div className="mt-10 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-5 pb-2 font-mono text-[10.5px] tracking-[0.1em] text-muted-foreground uppercase sm:mt-16">
               <span>© {new Date().getFullYear()} JIANG RUIJIAN · jiangruijian.com</span>
-              <span>Built with Next.js · Hosted on Vercel</span>
+              <div className="flex items-center gap-2.5">
+                <PrivacyPolicyButton className="hover:underline" />
+                <span aria-hidden>·</span>
+                <span>Built with Next.js · Hosted on Vercel</span>
+              </div>
             </div>
           </div>
 
@@ -157,6 +163,7 @@ export default async function BlogLayout({ children }: { children: React.ReactNo
           </span>
         </footer>
         <FloatingActionDock />
+        <CookieConsentBanner />
       </div>
     </FloatingActionsProvider>
   );

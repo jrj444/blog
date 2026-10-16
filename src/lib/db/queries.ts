@@ -32,36 +32,10 @@ import { buildCommentThreads, type CommentThreadItem } from "@/lib/comments/tree
  */
 const activeTagsPerPost = sql<TagSummary[]>`coalesce((
   select json_agg(json_build_object('id', t.id, 'name', t.name, 'slug', t.slug) order by pt.position)
-  from
-${postTags}
-pt
-join
-${tags}
-t
-on
-t
-.
-id
-=
-pt
-.
-tag_id
-where
-pt
-.
-post_id
-=
-${posts.id}
-and
-t
-.
-is_active
-),
-'[]'
-:
-:
-json
-)`;
+  from ${postTags} pt
+  join ${tags} t on t.id = pt.tag_id
+  where pt.post_id = ${posts.id} and t.is_active
+), '[]'::json)`;
 
 /** 列表页只需要这些列：正文 content_md 不参与列表渲染（否则每次列表都要搬运全文）。 */
 const listColumns = {
@@ -76,18 +50,9 @@ const listColumns = {
   views: posts.views,
   createdAt: posts.createdAt,
   updatedAt: posts.updatedAt,
+  likes: sql<number>`coalesce((select count(*)::int from ${postLikes} where ${postLikes.postId} = ${posts.id}), 0)`,
   // 阅读时长在 SQL 里算，避免为了一个「x 分钟」把整篇正文取回应用层
-  charCount: sql<number>`length
-  (regexp_replace(
-  ${posts.contentMd},
-  '\\s',
-  '',
-  'g'
-  )
-  )
-  :
-  :
-  int`,
+  charCount: sql<number>`length(regexp_replace(${posts.contentMd}, '\\s', '', 'g'))::int`,
 };
 
 type PostListRow = {
@@ -100,6 +65,7 @@ type PostListRow = {
   published: boolean;
   publishedAt: Date | null;
   views: number;
+  likes: number;
   createdAt: Date;
   updatedAt: Date;
   charCount: number;
@@ -261,26 +227,40 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
       db.select({ value: count() }).from(posts).where(where),
     ]);
 
-    // 标签走关系表批量取（含停用，后台可标注）
+    // 标签与点赞走关系表批量取
     const postIds = rows.map((row) => row.id);
     const tagsByPost = new Map<string, TagOption[]>();
+    const likesByPost = new Map<string, number>();
     if (postIds.length > 0) {
-      const tagRows = await db
-        .select({
-          postId: postTags.postId,
-          id: tags.id,
-          name: tags.name,
-          slug: tags.slug,
-          isActive: tags.isActive,
-        })
-        .from(postTags)
-        .innerJoin(tags, eq(tags.id, postTags.tagId))
-        .where(inArray(postTags.postId, postIds))
-        .orderBy(postTags.position);
+      const [tagRows, likeRows] = await Promise.all([
+        db
+          .select({
+            postId: postTags.postId,
+            id: tags.id,
+            name: tags.name,
+            slug: tags.slug,
+            isActive: tags.isActive,
+          })
+          .from(postTags)
+          .innerJoin(tags, eq(tags.id, postTags.tagId))
+          .where(inArray(postTags.postId, postIds))
+          .orderBy(postTags.position),
+        db
+          .select({
+            postId: postLikes.postId,
+            likes: count(),
+          })
+          .from(postLikes)
+          .where(inArray(postLikes.postId, postIds))
+          .groupBy(postLikes.postId),
+      ]);
       for (const { postId, ...tag } of tagRows) {
         const list = tagsByPost.get(postId) ?? [];
         list.push(tag);
         tagsByPost.set(postId, list);
+      }
+      for (const { postId, likes } of likeRows) {
+        likesByPost.set(postId, likes);
       }
     }
 
@@ -289,6 +269,7 @@ export async function listPosts(paramsOrPage: ListPostsParams | number = 1, mayb
         ...row,
         // 标签来自关系表批量查询（旧标签数组列已随 P5 删除）
         tags: tagsByPost.get(row.id) ?? [],
+        likes: likesByPost.get(row.id) ?? 0,
       })),
       total,
       counts,
@@ -316,8 +297,8 @@ export async function getPostById(id: string): Promise<PostDetailAdmin | undefin
 
 // 后台仪表盘：最近更新的文章（含草稿），按更新时间倒序
 export function listRecentPosts(limit = 5) {
-  return queryWithRetry(() =>
-    db
+  return queryWithRetry(async () => {
+    const rows = await db
       .select({
         id: posts.id,
         slug: posts.slug,
@@ -328,14 +309,26 @@ export function listRecentPosts(limit = 5) {
       })
       .from(posts)
       .orderBy(desc(posts.updatedAt))
-      .limit(limit),
-  );
+      .limit(limit);
+
+    const postIds = rows.map((r) => r.id);
+    const likesMap = new Map<string, number>();
+    if (postIds.length > 0) {
+      const likeRows = await db
+        .select({ postId: postLikes.postId, likes: count() })
+        .from(postLikes)
+        .where(inArray(postLikes.postId, postIds))
+        .groupBy(postLikes.postId);
+      for (const r of likeRows) likesMap.set(r.postId, r.likes);
+    }
+    return rows.map((r) => ({ ...r, likes: likesMap.get(r.id) ?? 0 }));
+  });
 }
 
 // 后台仪表盘：阅读量最高的前 N 篇已发布文章
 export function listTopViewedPosts(limit = 5) {
-  return queryWithRetry(() =>
-    db
+  return queryWithRetry(async () => {
+    const rows = await db
       .select({
         id: posts.id,
         slug: posts.slug,
@@ -346,29 +339,45 @@ export function listTopViewedPosts(limit = 5) {
       .from(posts)
       .where(eq(posts.published, true))
       .orderBy(desc(posts.views), desc(posts.createdAt))
-      .limit(limit),
-  );
+      .limit(limit);
+
+    const postIds = rows.map((r) => r.id);
+    const likesMap = new Map<string, number>();
+    if (postIds.length > 0) {
+      const likeRows = await db
+        .select({ postId: postLikes.postId, likes: count() })
+        .from(postLikes)
+        .where(inArray(postLikes.postId, postIds))
+        .groupBy(postLikes.postId);
+      for (const r of likeRows) likesMap.set(r.postId, r.likes);
+    }
+    return rows.map((r) => ({ ...r, likes: likesMap.get(r.id) ?? 0 }));
+  });
 }
 
-// 后台仪表盘统计：已发表 / 草稿 / 今年发布 / 总阅读量。
+// 后台仪表盘统计：已发表 / 草稿 / 今年发布 / 总阅读量 / 总点赞量。
 // 合并为单次查询——一趟往返拿全部计数，避免多次串行 round trip。
 export async function getDashboardStats() {
   return queryWithRetry(async () => {
-    const rows = await db.execute(sql`
-      select count(*) filter (where ${posts.published})::int as published, count(*) filter (where not ${posts.published})::int as drafts, count(*) filter (
-          where ${posts.published}
-            and ${posts.publishedAt} is not null
-            and extract(year from ${posts.publishedAt}) = extract(year from now())
-        )::int as this_year, coalesce(sum(${posts.views}), 0) ::int as views
-      from ${posts}
-    `);
+    const [statsRows, likeCountRows] = await Promise.all([
+      db.execute(sql`
+        select count(*) filter (where ${posts.published})::int as published, count(*) filter (where not ${posts.published})::int as drafts, count(*) filter (
+            where ${posts.published}
+              and ${posts.publishedAt} is not null
+              and extract(year from ${posts.publishedAt}) = extract(year from now())
+          )::int as this_year, coalesce(sum(${posts.views}), 0) ::int as views
+        from ${posts}
+      `),
+      db.select({ value: count() }).from(postLikes),
+    ]);
 
-    const row = firstRow(rows as ReadonlyArray<Record<string, number>>);
+    const row = firstRow(statsRows as ReadonlyArray<Record<string, number>>);
     return {
       published: row?.published ?? 0,
       drafts: row?.drafts ?? 0,
       thisYear: row?.this_year ?? 0,
       views: row?.views ?? 0,
+      likes: likeCountRows[0]?.value ?? 0,
     };
   });
 }
@@ -666,17 +675,7 @@ async function queryListPublishedPosts(args: PublishedPostsArgs): Promise<Publis
   if (tagId) {
     // 按关系表过滤（§11.1）：不再 arrayContains 数组列
     conditions.push(
-      sql`exists (select 1 from
-      ${postTags}
-      where
-      ${postTags.postId}
-      =
-      ${posts.id}
-      and
-      ${postTags.tagId}
-      =
-      ${tagId}
-      )`,
+      sql`exists (select 1 from ${postTags} where ${postTags.postId} = ${posts.id} and ${postTags.tagId} = ${tagId})`,
     );
   }
   if (pattern) {
@@ -690,13 +689,7 @@ async function queryListPublishedPosts(args: PublishedPostsArgs): Promise<Publis
     .where(where)
     .orderBy(
       // 搜索时标题命中优先;非搜索按发布时间倒序（发布时间即前台时间线）
-      ...(pattern
-        ? [
-            desc(sql`${posts.title}
-          ilike
-          ${pattern}`),
-          ]
-        : []),
+      ...(pattern ? [desc(sql`${posts.title} ilike ${pattern}`)] : []),
       desc(posts.publishedAt),
     )
     .limit(pageSize)
@@ -740,9 +733,7 @@ export async function searchPublishedPosts(q: string, limit = 8): Promise<PostLi
       )
       .orderBy(
         // 标题命中优先，再按发布时间倒序
-        desc(sql`${posts.title}
-        ilike
-        ${pattern}`),
+        desc(sql`${posts.title} ilike ${pattern}`),
         desc(posts.publishedAt),
       )
       .limit(limit);

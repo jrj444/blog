@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink, Eye, Feather, PenLine, Search } from "lucide-react";
+import { ExternalLink, Eye, Feather, PenLine, Search, ThumbsUp } from "lucide-react";
 import { listPosts } from "@/lib/db/queries";
 import { DeletePostButton } from "@/components/admin/delete-post-button";
 import { getPostContentAction } from "./actions";
@@ -149,7 +149,7 @@ export default async function AdminPostsPage({
               <tr>
                 <th className="px-5 py-3.5 font-medium">标题</th>
                 <th className="w-24 px-5 py-3.5 font-medium">状态</th>
-                <th className="w-24 px-5 py-3.5 font-medium">阅读量</th>
+                <th className="w-32 px-5 py-3.5 font-medium">阅读 / 点赞</th>
                 <th className="w-32 px-5 py-3.5 font-medium">发布时间</th>
                 <th className="w-32 px-5 py-3.5 font-medium">创建时间</th>
                 <th className="w-40 px-5 py-3.5 text-right font-medium">操作</th>
@@ -158,7 +158,7 @@ export default async function AdminPostsPage({
             <tbody className="divide-y divide-border/70">
               {posts.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-16 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-5 py-16 text-center text-muted-foreground">
                     <div className="flex flex-col items-center gap-2">
                       <Feather aria-hidden className="size-5 text-muted-foreground/40" />
                       {q ? (
@@ -212,10 +212,22 @@ export default async function AdminPostsPage({
                       </span>
                     </td>
                     <td className="px-5 py-4 font-mono text-xs text-muted-foreground tabular-nums">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Eye aria-hidden className="size-3 text-muted-foreground/60" />
-                        {post.views}
-                      </span>
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="inline-flex items-center gap-1.5"
+                          title={`阅读量：${post.views}`}
+                        >
+                          <Eye aria-hidden className="size-3 text-muted-foreground/60" />
+                          {post.views}
+                        </span>
+                        <span
+                          className="inline-flex items-center gap-1.5 text-primary/80"
+                          title={`点赞数：${post.likes}`}
+                        >
+                          <ThumbsUp aria-hidden className="size-3" />
+                          {post.likes}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-5 py-4 font-mono text-xs whitespace-nowrap text-muted-foreground">
                       {post.publishedAt ? formatDateShort(post.publishedAt) : "—"}

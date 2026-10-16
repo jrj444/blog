@@ -56,6 +56,8 @@ export function PostCard({ post }: { post: PostListItem }) {
           <span>{charCount.toLocaleString()} 字</span>
           <span aria-hidden className="size-[3px] rounded-full bg-border" />
           <span>{post.views} 阅读</span>
+          <span aria-hidden className="size-[3px] rounded-full bg-border" />
+          <span>{post.likes} 赞</span>
         </p>
       </div>
 

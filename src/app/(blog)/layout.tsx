@@ -8,6 +8,8 @@ import { FloatingActionDock } from "@/components/blog/floating-action-dock";
 import { NavLinks } from "@/components/blog/nav-links";
 import { ReadingProgressBar } from "@/components/blog/reading-progress-bar";
 import { SearchDialog } from "@/components/blog/search-dialog";
+import { siteConfig } from "@/lib/site";
+import { GlobalJsonLd } from "@/components/blog/json-ld";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const SITE_LINKS = [
@@ -77,6 +79,7 @@ export default async function BlogLayout({ children }: { children: React.ReactNo
 
   return (
     <FloatingActionsProvider>
+      <GlobalJsonLd />
       <div className="relative flex flex-1 flex-col">
         <span aria-hidden className="site-wash" />
         <span aria-hidden className="site-grain" />
@@ -113,9 +116,12 @@ export default async function BlogLayout({ children }: { children: React.ReactNo
             <div className="grid grid-cols-1 gap-8 md:grid-cols-[1.5fr_1fr] md:gap-10">
               {/* 品牌区 */}
               <div>
-                <div className="font-serif text-xl font-bold tracking-tight">JIANG RUIJIAN</div>
+                <div className="font-serif text-xl font-bold tracking-tight">{siteConfig.name}</div>
                 <p className="mt-3 max-w-[34ch] text-sm leading-relaxed text-muted-foreground">
-                  Life cannot be replayed, so why not be greedy
+                  {siteConfig.slogan.en}
+                  <span className="mt-1 block text-xs text-muted-foreground/80">
+                    {siteConfig.slogan.zh}
+                  </span>
                 </p>
                 <div className="mt-6 flex gap-2">
                   <SocialIcon

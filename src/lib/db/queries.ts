@@ -869,6 +869,24 @@ export const allPublishedPosts = cached("all-published", () =>
     .limit(50),
 );
 
+/** 取最新一篇已发布文章（用于 SEO / JSON-LD / 动态推荐） */
+export const getLatestPublishedPost = cached("latest-published-post", async () => {
+  const [row] = await db
+    .select({
+      id: posts.id,
+      slug: posts.slug,
+      title: posts.title,
+      excerpt: posts.excerpt,
+      publishedAt: posts.publishedAt,
+      createdAt: posts.createdAt,
+    })
+    .from(posts)
+    .where(eq(posts.published, true))
+    .orderBy(desc(posts.publishedAt), desc(posts.createdAt))
+    .limit(1);
+  return row ?? null;
+});
+
 /** 后台复制按钮：惰性取单篇正文（不拉进列表查询与 RSC payload） */
 export async function getPostContentById(id: string): Promise<string | null> {
   return queryWithRetry(async () => {

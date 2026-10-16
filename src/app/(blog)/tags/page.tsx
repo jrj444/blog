@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Tags",
-  description: "Browse posts by tag.",
+  description: "按标签分类浏览所有文章。",
 };
 
 export default async function TagsPage() {

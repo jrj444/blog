@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Archive",
-  description: "All published posts.",
+  description: "全站技术博客、日常随笔与学习笔记归档。",
 };
 
 const PAGE_SIZE = 10;

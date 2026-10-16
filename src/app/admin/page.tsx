@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ExternalLink, Eye, FilePlus, Flame, PenLine, Rss } from "lucide-react";
+import { ExternalLink, Eye, FilePlus, Flame, PenLine, Rss, ThumbsUp } from "lucide-react";
 import {
   getDashboardStats,
   listRecentPosts,
@@ -45,6 +45,12 @@ export default async function AdminDashboardPage() {
       hint: "累计总人次",
       href: "/admin/posts",
     },
+    {
+      label: "总获赞量",
+      value: stats.likes,
+      hint: "累计获赞数",
+      href: "/admin/posts",
+    },
   ];
 
   const quickLinks = [
@@ -70,7 +76,10 @@ export default async function AdminDashboardPage() {
       />
 
       {/* KPI 卡片 */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4" aria-label="内容统计">
+      <section
+        className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+        aria-label="内容统计"
+      >
         {cards.map((card) => (
           <Link
             key={card.label}
@@ -134,7 +143,7 @@ export default async function AdminDashboardPage() {
                       {post.title}
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {formatDate(post.updatedAt)} · {post.views} 阅读
+                      {formatDate(post.updatedAt)} · {post.views} 阅读 · {post.likes} 赞
                     </p>
                   </div>
                   <span
@@ -195,9 +204,15 @@ export default async function AdminDashboardPage() {
                     <p className="truncate text-sm font-medium" title={post.title}>
                       {post.title}
                     </p>
-                    <p className="mt-1 flex items-center gap-1 font-mono text-xs text-muted-foreground">
-                      <Eye aria-hidden className="size-3" />
-                      <span>{post.views} 阅读</span>
+                    <p className="mt-1 flex items-center gap-2.5 font-mono text-xs text-muted-foreground">
+                      <span className="inline-flex items-center gap-1">
+                        <Eye aria-hidden className="size-3" />
+                        <span>{post.views} 阅读</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-primary/80">
+                        <ThumbsUp aria-hidden className="size-3" />
+                        <span>{post.likes} 赞</span>
+                      </span>
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">

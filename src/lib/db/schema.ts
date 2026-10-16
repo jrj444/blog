@@ -9,6 +9,7 @@ import {
   jsonb,
   index,
   primaryKey,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 
 // 文章正文、封面、发布时间等全部入库（Markdown），为后续 AI/RAG 铺路。
@@ -82,6 +83,64 @@ export const postTags = pgTable(
   (table) => [primaryKey({ columns: [table.postId, table.tagId] })],
 );
 
+// 文章点赞关联表
+// 联合主键 (postId, visitorId) 天然防止重复点赞，博客体量直接 count(*) 计算总数
+export const postLikes = pgTable(
+  "post_likes",
+  {
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    visitorId: uuid("visitor_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.postId, table.visitorId] })],
+);
+
+/**
+ * 评论表
+ * 两级楼中楼：parentId 绑定根评论，replyToId 绑定具体对话目标
+ */
+export const comments = pgTable(
+  "comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    postId: uuid("post_id")
+      .notNull()
+      .references(() => posts.id, { onDelete: "cascade" }),
+    parentId: uuid("parent_id"),
+    replyToId: uuid("reply_to_id"),
+    authorName: text("author_name").notNull(),
+    authorUrl: text("author_url"),
+    content: text("content").notNull(),
+    status: text("status").notNull().default("pending"),
+    ipHash: text("ip_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    // 自引用外键 删除根评论时级联删除整楼回复
+    foreignKey({
+      columns: [table.parentId],
+      foreignColumns: [table.id],
+    }).onDelete("cascade"),
+    // 自引用外键 删除某条子回复置空
+    foreignKey({
+      columns: [table.replyToId],
+      foreignColumns: [table.id],
+    }).onDelete("set null"),
+    // 查询索引
+    index("comments_post_created_idx").on(table.postId, table.createdAt),
+    index("comments_parent_created_idx").on(table.parentId, table.createdAt),
+    index("comments_ip_hash_idx").on(table.ipHash, table.createdAt),
+    index("comments_status_idx").on(table.status, table.createdAt),
+  ],
+);
+
+export type Comment = typeof comments.$inferSelect;
+export type NewComment = typeof comments.$inferInsert;
+export type PostLike = typeof postLikes.$inferSelect;
+export type NewPostLike = typeof postLikes.$inferInsert;
 export type Tag = typeof tags.$inferSelect;
 export type NewTag = typeof tags.$inferInsert;
 export type PostTag = typeof postTags.$inferSelect;

@@ -3,7 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Eye } from "lucide-react";
 import type { Metadata } from "next";
-import { getPublishedPostBySlug, getPostSiblings } from "@/lib/db/queries";
+import {
+  getPublishedPostBySlug,
+  getPostSiblings,
+  getLikeState,
+  listApprovedComments,
+} from "@/lib/db/queries";
 import { MarkdownWithToc } from "@/components/blog/markdown";
 import { PostNavigation } from "@/components/blog/post-navigation";
 import { TagBadge } from "@/components/blog/tag-badge";
@@ -15,6 +20,9 @@ import { formatDate, toIsoString } from "@/lib/format-date";
 import { readingTime } from "@/lib/reading-time";
 import { decodeRouteParam } from "@/lib/db/queries";
 import { siteConfig, absUrl } from "@/lib/site";
+import { cookies } from "next/headers";
+import { LikeButton } from "@/components/blog/like-button";
+import { Comments } from "@/components/blog/comments";
 
 // 页面数据来自数据库,每次请求实时渲染(构建期不访问数据库)。
 export const dynamic = "force-dynamic";
@@ -66,6 +74,10 @@ export default async function PostPage({ params }: Props) {
     notFound();
   }
 
+  const cookieStore = await cookies();
+  const visitorId = cookieStore.get("lk_visitor")?.value;
+  const likeState = await getLikeState(post.id, visitorId);
+
   const { prev, next } = await getPostSiblings(post.id);
 
   const postUrl = absUrl(`/posts/${post.slug}`);
@@ -93,6 +105,9 @@ export default async function PostPage({ params }: Props) {
     // JSON-LD keywords 用标签名称；查询已过滤停用标签（§9）
     ...(post.tags.length > 0 ? { keywords: post.tags.map((item) => item.name).join(", ") } : {}),
   };
+
+  const isCommentsEnabled = process.env.NEXT_PUBLIC_ENABLE_COMMENTS !== "false";
+  const commentsData = isCommentsEnabled ? await listApprovedComments(post.id) : null;
 
   return (
     <article className="mx-auto max-w-[68rem]">
@@ -157,6 +172,11 @@ export default async function PostPage({ params }: Props) {
           <footer className="mt-14 space-y-6 border-t border-border pt-6">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-2">
+                <LikeButton
+                  postId={post.id}
+                  initialCount={likeState.count}
+                  initialLiked={likeState.liked}
+                />
                 <SharePosterButton
                   post={{
                     title: post.title,
@@ -182,6 +202,13 @@ export default async function PostPage({ params }: Props) {
               </Link>
             </div>
             <PostNavigation prev={prev} next={next} />
+            {isCommentsEnabled && commentsData && (
+              <Comments
+                postId={post.id}
+                initialThreads={commentsData.threads}
+                initialTotalCount={commentsData.totalCount}
+              />
+            )}
           </footer>
         }
       />

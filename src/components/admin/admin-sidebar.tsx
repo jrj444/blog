@@ -8,6 +8,7 @@ import {
   ImageIcon,
   LayoutDashboard,
   PenLine,
+  MessageSquare,
   Rss,
   Tags,
 } from "lucide-react";
@@ -41,6 +42,12 @@ const WORKSPACE_ITEMS: NavItem[] = [
     label: "标签",
     icon: Tags,
     isActive: (pathname) => pathname.startsWith("/admin/tags"),
+  },
+  {
+    href: "/admin/comments",
+    label: "评论",
+    icon: MessageSquare,
+    isActive: (pathname) => pathname.startsWith("/admin/comments"),
   },
   {
     href: "/admin/media",

@@ -12,6 +12,9 @@ function getSectionTitle(pathname: string) {
   if (pathname === "/admin/posts/new") return "新建文章";
   if (pathname.startsWith("/admin/posts/")) return "编辑文章";
   if (pathname.startsWith("/admin/posts")) return "文章";
+  if (pathname.startsWith("/admin/tags")) return "标签";
+  if (pathname.startsWith("/admin/comments")) return "评论";
+  if (pathname.startsWith("/admin/media")) return "媒体库";
   if (pathname === "/admin") return "概览";
   return "管理后台";
 }

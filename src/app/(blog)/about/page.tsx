@@ -3,7 +3,7 @@ import { siteConfig } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "About",
-  description: `关于 ${siteConfig.name}：记录日常 coding 与分享。`,
+  description: `关于 ${siteConfig.name}：记录个人日常、学习随笔与生活思考。`,
 };
 
 const HELLO_WORLD = "Hello World!";

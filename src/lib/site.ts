@@ -4,8 +4,19 @@ const siteUrl = process.env.SITE_URL ?? process.env.AUTH_URL ?? "http://localhos
 
 export const siteConfig = {
   name: "JIANG RUIJIAN",
+  title: "JIANG RUIJIAN 的个人博客",
   description:
-    "Notes on engineering trade-offs, mistakes, and some days that have nothing to do with code.",
+    "JIANG RUIJIAN 的个人博客，记录日常与学习，分享生活思考与随笔。人生不可重来，贪婪有何不可。",
+  slogan: {
+    zh: "人生不可重来，贪婪有何不可。",
+    en: "Life cannot be replayed, so why not be greedy",
+  },
+  keywords: ["JIANG RUIJIAN", "个人博客", "学习笔记", "日常随笔", "生活记录", "技术思考"],
+  author: {
+    name: "JIANG RUIJIAN",
+    url: siteUrl.replace(/\/+$/, ""),
+    github: "https://github.com/jrj444",
+  },
   url: siteUrl.replace(/\/+$/, ""), // 去掉末尾斜杠，方便拼路径
 } as const;
 

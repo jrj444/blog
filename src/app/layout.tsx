@@ -25,10 +25,14 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {
-    default: siteConfig.name,
+    default: siteConfig.title,
     template: `%s · ${siteConfig.name}`,
   },
   description: siteConfig.description,
+  keywords: [...siteConfig.keywords],
+  authors: [{ name: siteConfig.author.name, url: siteConfig.author.url }],
+  creator: siteConfig.author.name,
+  publisher: siteConfig.author.name,
   alternates: {
     types: {
       "application/rss+xml": `${siteConfig.url}/feed.xml`,
@@ -36,14 +40,15 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: "website",
+    locale: "zh_CN",
     siteName: siteConfig.name,
-    title: siteConfig.name,
+    title: siteConfig.title,
     description: siteConfig.description,
     url: siteConfig.url,
   },
   twitter: {
     card: "summary",
-    title: siteConfig.name,
+    title: siteConfig.title,
     description: siteConfig.description,
   },
 };
